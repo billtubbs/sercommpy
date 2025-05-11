@@ -79,10 +79,3 @@ def decode_bytes(bytes_seq: nb.uint8[:]) -> nb.uint8[:]:
         data_out.append(x)
         n += 1
     return np.array(data_out, dtype='uint8')
-
-
-# Call these functions to make sure they are jit compiled
-data = [0, 64, 65, 253, 254, 255]
-encoded_data = encode_data(data)
-decoded_data = decode_bytes(encoded_data)
-assert np.array_equal(decoded_data, data)
