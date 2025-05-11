@@ -1,7 +1,7 @@
 from collections import deque
 import numpy as np
 import serial
-from src.serial_comm import send_data_to_arduino, receive_data_from_arduino
+from serial_comm.serial_comm import (send_data_to_arduino, receive_data_from_arduino)
 import logging
 import os
 
