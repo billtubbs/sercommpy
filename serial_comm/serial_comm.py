@@ -5,7 +5,7 @@ Bill Tubbs
 May 2025
 
 """
-
+import time
 import numpy as np
 import numba as nb
 from itertools import chain
@@ -16,6 +16,29 @@ START_MARKER = 254
 END_MARKER = 255
 SPECIAL_BYTE = 253
 MAX_PACKAGE_LEN = 8192
+
+
+def connect_to_arduino(ser, timeout_time=10):
+    # Wait for the initial hello message from the Arduino
+    # TODO: Move this to serial_comm.py
+    hello_message = b'My name is '
+    t0 = time.time()
+    while (time.time() - t0) < timeout_time:
+        if ser.in_waiting > 0:
+            data_received = receive_data_from_arduino(ser)
+            if np.array_equal(data_received[:2], [0, 0]):
+                message_bytes = bytes(data_received[2:])
+                assert message_bytes.startswith(hello_message)
+                message = message_bytes.removeprefix(
+                    hello_message
+                ).decode('utf')
+                status = 0
+                break
+            else:
+                status, message = 2, "No hello message in data received"
+    if (time.time() - t0) > timeout_time:
+        status, message = 1, "Timeout"
+    return status, message
 
 
 def send_data_to_arduino(ser, data):

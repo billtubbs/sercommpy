@@ -2,7 +2,7 @@ from itertools import cycle
 import numpy as np
 import serial
 from serial_comm.serial_comm import (
-    send_data_to_arduino, receive_data_from_arduino
+    connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
 )
 import logging
 import os
@@ -38,27 +38,12 @@ def run_test(ser):
     # Calculate check-sums to check data transmission
     test_data_cycle = cycle([(i, data, np.sum(data)) for i, data in test_data])
 
-    # Wait for the initial hello message from the Arduino
-    # TODO: Move this to serial_comm.py
-    hello_message = b'My name is '
-    t0 = time.time()
-    timeout_time = 10
-    while (time.time() - t0) < timeout_time:
-        if ser.in_waiting > 0:
-            data_received = receive_data_from_arduino(ser)
-            if np.array_equal(data_received[:2], [0, 0]):
-                message_bytes = bytes(data_received[2:])
-                assert message_bytes.startswith(hello_message)
-                worker_name = message_bytes.removeprefix(
-                    hello_message
-                ).decode('utf')
-                logger.info(f"Hello from: {worker_name}")
-                break
-            else:
-                raise Exception("No hello message before data received")
-
-    if (time.time() - t0) > timeout_time:
-        raise Exception("No hello message received")
+    status, message = connect_to_arduino(ser)
+    if status == 0:
+        worker_name = message
+    else:
+        raise Exception(message)
+    logger.info(f"Hello from: {worker_name}")
 
     time.sleep(1.0)
     t_start = time.time()
@@ -86,7 +71,7 @@ def run_test(ser):
             if np.array_equal(data_received[:2], [0, 0]):
                 logger.info(f"Debug message: {data_received[2:].tobytes()}")
             else:
-                assert data_received.shape == 6
+                assert data_received.shape[0] == 6
                 num_bytes_received = (
                     int(data_received[0]) * 256 + int(data_received[1])
                 )
@@ -99,7 +84,7 @@ def run_test(ser):
                 assert num_bytes_received == data.shape[0]
                 assert data_sum == check_sum
                 i_iter += 1
-                logger.info(f"Test complete.")
+                logger.info(f"Test {i_iter} complete.")
                 waiting_for_response = False
 
     t_end = time.time()
