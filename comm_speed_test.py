@@ -1,7 +1,9 @@
 from itertools import cycle
 import numpy as np
 import serial
-from serial_comm.serial_comm import (send_data_to_arduino, receive_data_from_arduino)
+from serial_comm.serial_comm import (
+    send_data_to_arduino, receive_data_from_arduino
+)
 import logging
 import os
 import time
@@ -37,16 +39,17 @@ def run_test(ser):
     test_data_cycle = cycle([(i, data, np.sum(data)) for i, data in test_data])
 
     # Wait for the initial hello message from the Arduino
+    # TODO: Move this to serial_comm.py
     hello_message = b'My name is '
     t0 = time.time()
     timeout_time = 10
     while (time.time() - t0) < timeout_time:
         if ser.in_waiting > 0:
-            num_bytes, data_received = receive_data_from_arduino(ser)
-            if num_bytes == 0:
-                bytes_received = bytes(data_received)
-                assert bytes_received.startswith(hello_message)
-                worker_name = bytes_received.removeprefix(
+            data_received = receive_data_from_arduino(ser)
+            if np.array_equal(data_received[:2], [0, 0]):
+                message_bytes = bytes(data_received[2:])
+                assert message_bytes.startswith(hello_message)
+                worker_name = message_bytes.removeprefix(
                     hello_message
                 ).decode('utf')
                 logger.info(f"Hello from: {worker_name}")
@@ -78,21 +81,22 @@ def run_test(ser):
 
         if ser.in_waiting > 0:
             logger.info("Receiving data...")
-            num_bytes, data_received = receive_data_from_arduino(ser)
+            data_received = receive_data_from_arduino(ser)
             logger.info("Data received.")
-            if num_bytes == 0:
-                logger.info(f"Debug message: {data_received.tobytes()}")
+            if np.array_equal(data_received[:2], [0, 0]):
+                logger.info(f"Debug message: {data_received[2:].tobytes()}")
             else:
+                assert data_received.shape == 6
                 num_bytes_received = (
                     int(data_received[0]) * 256 + int(data_received[1])
                 )
                 data_sum = (
-                    int(data_received[2]) * 256 ** 3
-                    + int(data_received[3]) * 256 ** 2
+                    int(data_received[2]) * 16777216
+                    + int(data_received[3]) * 65536
                     + int(data_received[4]) * 256
                     + int(data_received[5])
                 )
-                assert num_bytes_received == data.shape[0] + 2
+                assert num_bytes_received == data.shape[0]
                 assert data_sum == check_sum
                 i_iter += 1
                 logger.info(f"Test complete.")
@@ -104,12 +108,12 @@ def run_test(ser):
 
 
 def main():
+    logger.info('='*35)
     logger.info(f'{filename} started.')
     ser = connect()
     logger.info("Connected to Arduino.")
     run_test(ser)
     logger.info(f"{filename} complete.")
-    logger.info('='*35)
     ser.close()
 
 
