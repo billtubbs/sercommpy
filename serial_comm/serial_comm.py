@@ -18,10 +18,8 @@ SPECIAL_BYTE = 253
 MAX_PACKAGE_LEN = 8192
 
 
-def connect_to_arduino(ser, timeout_time=10):
+def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
     # Wait for the initial hello message from the Arduino
-    # TODO: Move this to serial_comm.py
-    hello_message = b'My name is '
     t0 = time.time()
     while (time.time() - t0) < timeout_time:
         if ser.in_waiting > 0:
@@ -43,11 +41,9 @@ def connect_to_arduino(ser, timeout_time=10):
 
 def send_data_to_arduino(ser, data):
     global START_MARKER, END_MARKER
-    # Length includes 2 bytes to transmit length value
-    #length_bytes = (data.shape[0] + 2).to_bytes(length=2, byteorder='big')
+    # TODO: Make this non-blocking
     ser.write(chain.from_iterable([
         [START_MARKER],
-        #encode_data(length_bytes),  # TODO: Remove this
         encode_data(data),
         [END_MARKER]
     ]))
