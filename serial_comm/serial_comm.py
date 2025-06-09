@@ -5,7 +5,7 @@ Bill Tubbs
 May 2025
 
 """
-
+import time
 import numpy as np
 import numba as nb
 from itertools import chain
@@ -18,13 +18,32 @@ SPECIAL_BYTE = 253
 MAX_PACKAGE_LEN = 8192
 
 
+def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
+    # Wait for the initial hello message from the Arduino
+    t0 = time.time()
+    while (time.time() - t0) < timeout_time:
+        if ser.in_waiting > 0:
+            data_received = receive_data_from_arduino(ser)
+            if np.array_equal(data_received[:2], [0, 0]):
+                message_bytes = bytes(data_received[2:])
+                assert message_bytes.startswith(hello_message)
+                message = message_bytes.removeprefix(
+                    hello_message
+                ).decode('utf')
+                status = 0
+                break
+            else:
+                status, message = 2, "No hello message in data received"
+    if (time.time() - t0) > timeout_time:
+        status, message = 1, "Timeout"
+    return status, message
+
+
 def send_data_to_arduino(ser, data):
     global START_MARKER, END_MARKER
-    # Length includes 2 bytes to transmit length value
-    length_bytes = (data.shape[0] + 2).to_bytes(length=2, byteorder='big')
+    # TODO: Make this non-blocking
     ser.write(chain.from_iterable([
         [START_MARKER],
-        encode_data(length_bytes),
         encode_data(data),
         [END_MARKER]
     ]))
@@ -45,10 +64,10 @@ def receive_data_from_arduino(ser):
         f"No end marker found after {MAX_PACKAGE_LEN * 2 + 1} bytes read"
     # Decode and convert to numpy array
     bytes_seq = decode_bytes(bytes_seq[:-1])  # omit end marker
-    assert bytes_seq.shape[0] - 2 <= MAX_PACKAGE_LEN, \
+    assert bytes_seq.shape[0] <= MAX_PACKAGE_LEN, \
         f"More than {MAX_PACKAGE_LEN} data bytes in package"
-    n_bytes = int.from_bytes(bytes_seq[0:2], byteorder='big')
-    return n_bytes, bytes_seq[2:]
+    # n_bytes = int.from_bytes(bytes_seq[0:2], byteorder='big')
+    return bytes_seq
 
 
 @nb.njit()
