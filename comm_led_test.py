@@ -34,11 +34,19 @@ def run_test(ser):
         np.array(list(b'L1') + [0, 0, 32, 4, 32], dtype="uint8"),
         np.array(list(b'SN'), dtype="uint8"),
         np.array(
-            list(b'LN') + [0, 3, 0, 0, 32, 4, 32, 0, 2, 4, 32, 32, 0, 4, 32, 32, 4],
+            list(b'LN') + [
+                0, 4,
+                0, 0, 32, 4, 10,
+                0, 2, 4, 10, 32,
+                0, 4, 10, 32, 4,
+                0, 6, 10, 4, 32
+            ],
             dtype="uint8"
         ),
         np.array(list(b'SN'), dtype="uint8"),
         np.array(list(b'LA') + 7 * [32, 4, 32], dtype="uint8"),
+        np.array(list(b'SN'), dtype="uint8"),
+        np.array(list(b'LC'), dtype="uint8"),
         np.array(list(b'SN'), dtype="uint8"),
     ]
 
@@ -95,7 +103,7 @@ def run_test(ser):
                 logger.info(f"Test {i_iter} complete.")
                 i_iter += 1
                 waiting_for_response = False
-                #time.sleep(1)
+                time.sleep(0.5)
 
     t_end = time.time()
     logger.info(f"Elapsed time: {t_end - t_start:.3f}s for {n_iter} tests.")
