@@ -34,7 +34,7 @@ def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
                 break
             else:
                 status, message = 2, "No hello message in data received"
-    if (time.time() - t0) > timeout_time:
+    if (time.time() - t0) >= timeout_time:
         status, message = 1, "Timeout"
     return status, message
 

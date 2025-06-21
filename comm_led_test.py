@@ -20,8 +20,20 @@ logging.basicConfig(
     format=LOG_FORMAT
 )
 
+BAUD = 57600
 
-def connect(address="/dev/tty.usbmodem112977801", baud=57600):
+# Serial ports of Teensy devices
+# Find these by running ls /dev/tty.* from command line
+SERIAL_PORTS = {
+    49: '/dev/cu.usbmodem12745401',
+    50: '/dev/cu.usbmodem6862001'
+}
+# Usually, 
+#  - TEENSY1 is on usb port 1275401
+#  - TEENSY2 is on usb port 6862001
+
+
+def connect(address='/dev/cu.usbmodem6862001', baud=BAUD):
     ser = serial.Serial(address, baud)
     return ser
 
