@@ -34,8 +34,8 @@ def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
                 break
             else:
                 status, message = 2, "No hello message in data received"
-    if (time.time() - t0) >= timeout_time:
-        status, message = 1, "Timeout"
+        if (time.time() - t0) >= timeout_time:
+            status, message = 1, "Timeout"
     return status, message
 
 
@@ -98,3 +98,8 @@ def decode_bytes(bytes_seq: nb.uint8[:]) -> nb.uint8[:]:
         data_out.append(x)
         n += 1
     return np.array(data_out, dtype='uint8')
+
+
+# Call the functions to jit compile them
+encode_data(np.ones(10, dtype='uint8'))
+decode_bytes(np.ones(10, dtype='uint8'))

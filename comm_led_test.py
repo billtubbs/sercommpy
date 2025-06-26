@@ -5,7 +5,6 @@ import serial
 from serial_comm.serial_comm import (
     connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
 )
-import keyboard
 import logging
 import os
 import time
@@ -22,22 +21,27 @@ logging.basicConfig(
     format=LOG_FORMAT
 )
 
-BAUD = 57600
+BAUD_RATE = 57600
 
 # Serial ports of Teensy devices
 # Find these by running ls /dev/tty.* from command line
-SERIAL_PORTS = {
-    49: '/dev/cu.usbmodem12745401',
-    50: '/dev/cu.usbmodem6862001'
-}
+# SERIAL_PORTS = {
+#     49: '/dev/cu.usbmodem12745401',
+#     50: '/dev/cu.usbmodem6862001'
+# }
 # Usually, 
 #  - TEENSY1 is on usb port 1275401
 #  - TEENSY2 is on usb port 6862001
-port = 50
+# Raspberry Pi uses the /dev/ttyACM* naming scheme 
+# Find these by running ls /dev/tty.* from command line
+SERIAL_PORTS = [
+    '/dev/ttyACM0',
+    '/dev/ttyACM1'
+]
+# Usually, 
+#  - TEENSY1 is on usb port '/dev/ttyACM1'
+#  - TEENSY2 is on usb port '/dev/ttyACM0'
 
-def connect(address='/dev/cu.usbmodem6862001', baud=BAUD):
-    ser = serial.Serial(SERIAL_PORTS[port], baud)
-    return ser
 
 
 def move_pointer_commands(i1, i2):
@@ -150,17 +154,9 @@ def run_test(ser):
         np.array(list(b'SN'), dtype="uint8"),
     ]
 
-    # Calculate check-sums to check data transmission
+    # Iterator to cycle through test data
     test_data_cycle = cycle(test_data)
 
-    status, message = connect_to_arduino(ser)
-    if status == 0:
-        worker_name = message
-    else:
-        raise Exception(message)
-    logger.info(f"Hello from: {worker_name}")
-
-    time.sleep(1.0)
     t_start = time.time()
     logger.info("Test start")
 
@@ -203,22 +199,45 @@ def run_test(ser):
                 logger.info(f"Test {i_iter} complete.")
                 i_iter += 1
                 waiting_for_response = False
-                time.sleep(0.5)
+                #time.sleep(0.5)
 
     t_end = time.time()
     logger.info(f"Elapsed time: {t_end - t_start:.3f}s for {n_iter} tests.")
     logger.info(f"Cycle time: {(t_end - t_start) * 1000 / n_iter:.0f}ms.")
 
 
+def open_serial_connections(ports):
+    connections = {}
+    for port in SERIAL_PORTS:
+        conn = serial.Serial(port, baudrate=BAUD_RATE)
+        logger.info(f'Connected to port {port}.')
+        
+        status, message = connect_to_arduino(conn)
+        if status == 0:
+            worker_name = message
+        else:
+            raise Exception(message)
+        logger.info(f"Hello from: {worker_name}")
+        connections[worker_name] = conn
+
+    return connections
+
+
+def close_serial_connections(connections):
+    for name, conn in connections.items():
+        conn.close()
+        logger.info(f'Closed connection to {name}.')
+
+
 def main():
     logger.info('='*35)
     logger.info(f'{filename} started.')
-    ser = connect()
-    logger.info("Connected to Arduino.")
-    #run_test(ser)
-    manual_testing(ser)
-    logger.info(f"{filename} complete.")
-    ser.close()
+    connections = open_serial_connections(SERIAL_PORTS)
+    run_test(connections['TEENSY1'])
+    run_test(connections['TEENSY2'])
+    #manual_testing(connections['TEENSY1'])
+    close_serial_connections(connections)
+    logger.info(f'{filename} ended.')
 
 
 if __name__ == "__main__":
