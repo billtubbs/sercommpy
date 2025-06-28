@@ -5,6 +5,7 @@ import serial
 from serial_comm.serial_comm import (
     connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
 )
+from display1593 import *
 import logging
 import os
 import time
@@ -132,27 +133,50 @@ def manual_testing(ser):
 
 def run_test(ser):
 
-    test_data = [
-        np.array(list(b'LC'), dtype="uint8"),
-        np.array(list(b'SN'), dtype="uint8"),
-        np.array(list(b'L1') + [0, 0, 32, 4, 32], dtype="uint8"),
-        np.array(list(b'SN'), dtype="uint8"),
-        np.array(
-            list(b'LN') + [
-                0, 4,
-                0, 0, 32, 4, 10,
-                0, 2, 4, 10, 32,
-                0, 4, 10, 32, 4,
-                0, 6, 10, 4, 32
-            ],
-            dtype="uint8"
-        ),
-        np.array(list(b'SN'), dtype="uint8"),
-        np.array(list(b'LA') + 7 * [32, 4, 32], dtype="uint8"),
-        np.array(list(b'SN'), dtype="uint8"),
-        np.array(list(b'LC'), dtype="uint8"),
-        np.array(list(b'SN'), dtype="uint8"),
-    ]
+    logger.info("Preparing test data...")
+    test_data = []
+    test_data.append(clear_all_leds())
+
+    test_data.append(show_now())
+    
+    # TEENSY1
+    # 0 100
+    # 1 100
+    # 2 98
+    # 3 100
+    # 4 100
+    # 5 100
+    # 6 100
+    # 7 100
+
+    # TEENSY2
+    # 0 99
+    # 1 99
+    # 2 99
+    # 3 100
+    # 4 100
+    # 5 100
+    # 6 100
+    # 7 98
+
+    # String start number
+    s = 700
+    
+    # Light first 95 leds
+    leds = np.arange(s, s + 95)
+    rgb_array = 16 * np.ones((95, 3))
+    test_data.append(set_leds(leds, rgb_array))
+    
+    test_data.append(show_now())
+    
+    # Light 5 more leds
+    leds = np.arange(s + 95, s + 100)
+    rgb_5 = np.array([
+        (32, 0, 0), (0, 32, 0), (0, 0, 32), (32, 32, 0), (32, 0, 32)
+    ], dtype='uint8')
+    test_data.append(set_leds(leds, rgb_5))
+
+    test_data.append(show_now())
 
     # Iterator to cycle through test data
     test_data_cycle = cycle(test_data)
@@ -234,7 +258,7 @@ def main():
     logger.info(f'{filename} started.')
     connections = open_serial_connections(SERIAL_PORTS)
     run_test(connections['TEENSY1'])
-    run_test(connections['TEENSY2'])
+    #run_test(connections['TEENSY2'])
     #manual_testing(connections['TEENSY1'])
     close_serial_connections(connections)
     logger.info(f'{filename} ended.')
