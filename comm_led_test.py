@@ -39,7 +39,7 @@ SERIAL_PORTS = [
     '/dev/ttyACM0',
     '/dev/ttyACM1'
 ]
-# Usually, 
+# Usually (but not always),
 #  - TEENSY1 is on usb port '/dev/ttyACM1'
 #  - TEENSY2 is on usb port '/dev/ttyACM0'
 
@@ -131,50 +131,53 @@ def manual_testing(ser):
                 time.sleep(0.5)
 
 
-def run_test(ser):
+def run_test(board, ser):
 
     logger.info("Preparing test data...")
+
     test_data = []
     test_data.append(clear_all_leds())
 
     test_data.append(show_now())
     
-    # TEENSY1
-    # 0 100
-    # 1 100
-    # 2 98
-    # 3 100
-    # 4 100
-    # 5 100
-    # 6 100
-    # 7 100
+    # LEDs per strip
+    leds_per_strip= {
+        'TEENSY1': [100, 100, 98, 100, 100, 100, 100, 100],
+        'TEENSY2': [99, 99, 99, 100, 100, 100, 100, 98]
+    }
+    first_led_of_strip = {
+        name: np.cumsum([0] + leds) for name, leds in leds_per_strip.items()
+    }
+    leds_per_strip = {
+        name: np.array(leds) for name, leds in leds_per_strip.items()
+    }
+    MAX_LEDS_PER_STRIP = 100
 
-    # TEENSY2
-    # 0 99
-    # 1 99
-    # 2 99
-    # 3 100
-    # 4 100
-    # 5 100
-    # 6 100
-    # 7 98
+    # Iterate over strips
+    for s in range(0, 8):
 
-    # String start number
-    s = 700
-    
-    # Light first 95 leds
-    leds = np.arange(s, s + 95)
-    rgb_array = 16 * np.ones((95, 3))
-    test_data.append(set_leds(leds, rgb_array))
-    
-    test_data.append(show_now())
-    
-    # Light 5 more leds
-    leds = np.arange(s + 95, s + 100)
-    rgb_5 = np.array([
-        (32, 0, 0), (0, 32, 0), (0, 0, 32), (32, 32, 0), (32, 0, 32)
-    ], dtype='uint8')
-    test_data.append(set_leds(leds, rgb_5))
+        start_led = s * MAX_LEDS_PER_STRIP
+        n_leds = leds_per_strip[board][s]
+
+        # Light LED
+        test_data.append(set_led(start_led, GREEN))
+
+        # Light last LED
+        test_data.append(set_led(start_led + n_leds - 1, RED))
+
+        # Light all remaining leds
+        leds = np.arange(start_led + 1, start_led + n_leds - 1)
+        rgb_array = 16 * np.ones((leds.shape[0], 3), dtype='uint8')
+        test_data.append(set_leds(leds, rgb_array))
+        
+        # Try to light additional leds at end of strip that should
+        # not exist
+        if n_leds < MAX_LEDS_PER_STRIP:
+            leds = np.arange(start_led + n_leds, start_led + MAX_LEDS_PER_STRIP)
+            rgb_array = np.repeat([YELLOW], leds.shape[0], axis=0)
+            test_data.append(set_leds(leds, rgb_array))
+
+        test_data.append(show_now())
 
     test_data.append(show_now())
 
@@ -257,8 +260,9 @@ def main():
     logger.info('='*35)
     logger.info(f'{filename} started.')
     connections = open_serial_connections(SERIAL_PORTS)
-    run_test(connections['TEENSY1'])
-    #run_test(connections['TEENSY2'])
+    for board in ['TEENSY1', 'TEENSY2']:
+        run_test(board, connections[board])
+    
     #manual_testing(connections['TEENSY1'])
     close_serial_connections(connections)
     logger.info(f'{filename} ended.')

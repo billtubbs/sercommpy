@@ -8,6 +8,7 @@ May 2025
 import time
 import numpy as np
 import numba as nb
+from numba import jit, types
 from itertools import chain
 
 
@@ -16,6 +17,12 @@ START_MARKER = 254
 END_MARKER = 255
 SPECIAL_BYTE = 253
 MAX_PACKAGE_LEN = 8192
+
+
+# Define the array types
+readonly_uint8_array = types.Array(types.uint8, 1, 'C', readonly=True)
+writable_uint8_array = types.Array(types.uint8, 1, 'C')
+
 
 
 def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
@@ -44,7 +51,7 @@ def send_data_to_arduino(ser, data):
     # TODO: Make this non-blocking
     ser.write(chain.from_iterable([
         [START_MARKER],
-        encode_data(data),
+        encode_data(data.astype(np.uint8)),
         [END_MARKER]
     ]))
 
@@ -62,16 +69,17 @@ def receive_data_from_arduino(ser):
     )
     assert bytes_seq[-1] == END_MARKER, \
         f"No end marker found after {MAX_PACKAGE_LEN * 2 + 1} bytes read"
-    # Decode and convert to numpy array
-    bytes_seq = decode_bytes(bytes_seq[:-1])  # omit end marker
-    assert bytes_seq.shape[0] <= MAX_PACKAGE_LEN, \
+    # Convert to numpy array and decode, omitting end marker
+    data = np.frombuffer(bytes_seq[:-1], dtype=np.uint8)
+    data = decode_bytes(data)
+    assert data.shape[0] <= MAX_PACKAGE_LEN, \
         f"More than {MAX_PACKAGE_LEN} data bytes in package"
-    # n_bytes = int.from_bytes(bytes_seq[0:2], byteorder='big')
-    return bytes_seq
+    return data
 
 
-@nb.njit()
-def encode_data(data: nb.uint8[:]) -> nb.uint8[:]:
+@jit([writable_uint8_array(readonly_uint8_array), 
+      writable_uint8_array(writable_uint8_array)], nopython=True)
+def encode_data(data):
     # TODO: Could this be converted to return bytes?
     global SPECIAL_BYTE
     data_out: nb.uint8[:] = []
@@ -81,25 +89,21 @@ def encode_data(data: nb.uint8[:]) -> nb.uint8[:]:
             data_out.append(x - SPECIAL_BYTE)
         else:
             data_out.append(x)
-    return np.array(data_out, dtype='uint8')
+    return np.array(data_out, dtype=np.uint8)
 
 
-@nb.njit()
-def decode_bytes(bytes_seq: nb.uint8[:]) -> nb.uint8[:]:
+@jit([writable_uint8_array(readonly_uint8_array), 
+      writable_uint8_array(writable_uint8_array)], nopython=True)
+def decode_bytes(data_in):
     # TODO: Could this be converted to accept bytes?
     global SPECIAL_BYTE
     data_out: nb.uint8[:] = []
     n = 0
-    while n < len(bytes_seq):
-        x = bytes_seq[n]
+    while n < len(data_in):
+        x = data_in[n]
         if x == SPECIAL_BYTE:
             n += 1
-            x = SPECIAL_BYTE + bytes_seq[n]
+            x = SPECIAL_BYTE + data_in[n]
         data_out.append(x)
         n += 1
-    return np.array(data_out, dtype='uint8')
-
-
-# Call the functions to jit compile them
-encode_data(np.ones(10, dtype='uint8'))
-decode_bytes(np.ones(10, dtype='uint8'))
+    return np.array(data_out, dtype=np.uint8)
