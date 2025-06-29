@@ -3,8 +3,10 @@
 | Code | Byte Data                                         |  Description                                   |
 | ---- | ------------------------------------------------- | ---------------------------------------------- |
 | L1   | [I, J, R, G, B]                                   | Set the colour of one LED                      |
-| LN   | [N1, N2, I1, J1, R1, G1, B1, ..., IN, JN, RN, GN, BN]  | Set a batch of N LED colours                   |
+| LN   | [N1, N2, I1, J1, R1, G1, B1, ..., IN, JN, RN, GN, BN]  | Set the colours of N LEDs                       |
 | LA   | [R1, G1, B1, ..., RL, GL, BL]                     | Set all LED colours                            |
+| CN   | [N1, N2, R, G, B, I1, J1, ..., IN, JN]            | Set N LEDs to one colour                       |
+| CA   | [R, G, B]                                         | Set all LEDs to one colour                     |
 | LB   | [B]                                               | Set brightness level (affects all LEDs)        |
 | LC   |                                                   | Clear screen (to black)                        |
 | G1   | [I, J]                                            | Get the colour of an LED                       |
