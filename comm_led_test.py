@@ -135,10 +135,10 @@ def run_test(board, ser):
 
     logger.info("Preparing test data...")
 
-    test_data = []
-    test_data.append(clear_all_leds())
+    command_list = []
+    command_list.append(clear_all_leds())
 
-    test_data.append(show_now())
+    command_list.append(show_now())
     
     # LEDs per strip
     leds_per_strip= {
@@ -159,42 +159,44 @@ def run_test(board, ser):
         start_led = s * MAX_LEDS_PER_STRIP
         n_leds = leds_per_strip[board][s]
 
-        # Light LED
-        test_data.append(set_led(start_led, GREEN))
+        # Light first LED
+        command_list.append(set_led(start_led, GREEN))
 
         # Light last LED
-        test_data.append(set_led(start_led + n_leds - 1, RED))
+        command_list.append(set_led(start_led + n_leds - 1, RED))
 
-        # Light all remaining leds
+        # Light all in between leds
         leds = np.arange(start_led + 1, start_led + n_leds - 1)
-        rgb_array = 16 * np.ones((leds.shape[0], 3), dtype='uint8')
-        test_data.append(set_leds(leds, rgb_array))
+#         rgb_array = 16 * np.ones((leds.shape[0], 3), dtype='uint8')
+#         command_list.append(set_leds(leds, rgb_array))
+        rgb = np.full((3,), 16, dtype=np.uint8)
+        command_list.append(set_leds_one_colour(leds, rgb))
         
         # Try to light additional leds at end of strip that should
         # not exist
         if n_leds < MAX_LEDS_PER_STRIP:
             leds = np.arange(start_led + n_leds, start_led + MAX_LEDS_PER_STRIP)
             rgb_array = np.repeat([YELLOW], leds.shape[0], axis=0)
-            test_data.append(set_leds(leds, rgb_array))
+            command_list.append(set_leds(leds, rgb_array))
 
-        test_data.append(show_now())
+        command_list.append(show_now())
 
-    test_data.append(show_now())
+    command_list.append(show_now())
 
     # Iterator to cycle through test data
-    test_data_cycle = cycle(test_data)
+    command_list_cycle = cycle(command_list)
 
     t_start = time.time()
     logger.info("Test start")
 
     waiting_for_response = False
-    n_iter = len(test_data)
+    n_iter = len(command_list)
     i_iter = 0
     while i_iter < n_iter:
 
         if ser.in_waiting == 0 and waiting_for_response is False:
             try:
-                data = next(test_data_cycle)
+                data = next(command_list_cycle)
             except IndexError:
                 break
             logger.info(f"Sending Test {i_iter} data...")
@@ -209,6 +211,7 @@ def run_test(board, ser):
             if np.array_equal(data_received[:2], [0, 0]):
                 # Debug message from Arduino
                 logger.info(f"Debug message: {data_received[2:].tobytes()}")
+                pass
             else:
                 # Process data from Arduino - data integrity checks
                 assert data_received.shape[0] == 6
@@ -226,7 +229,6 @@ def run_test(board, ser):
                 logger.info(f"Test {i_iter} complete.")
                 i_iter += 1
                 waiting_for_response = False
-                #time.sleep(0.5)
 
     t_end = time.time()
     logger.info(f"Elapsed time: {t_end - t_start:.3f}s for {n_iter} tests.")
