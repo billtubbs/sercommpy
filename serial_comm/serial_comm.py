@@ -71,7 +71,7 @@ def receive_data_from_arduino(ser):
         f"No end marker found after {MAX_PACKAGE_LEN * 2 + 1} bytes read"
     # Convert to numpy array and decode, omitting end marker
     data = np.frombuffer(bytes_seq[:-1], dtype=np.uint8)
-    data = decode_bytes(data)
+    data = decode_data(data)
     assert data.shape[0] <= MAX_PACKAGE_LEN, \
         f"More than {MAX_PACKAGE_LEN} data bytes in package"
     return data
@@ -94,7 +94,7 @@ def encode_data(data):
 
 @jit([writable_uint8_array(readonly_uint8_array), 
       writable_uint8_array(writable_uint8_array)], nopython=True)
-def decode_bytes(data_in):
+def decode_data(data_in):
     # TODO: Could this be converted to accept bytes?
     global SPECIAL_BYTE
     data_out: nb.uint8[:] = []
