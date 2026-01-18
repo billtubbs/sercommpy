@@ -1,11 +1,17 @@
-from itertools import chain
+from itertools import cycle, chain
+from collections import deque
+import serial
+
 import numpy as np
 from numba import jit, types
+
+from serial_comm.serial_comm import (
+    connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
+)
 
 
 # TODO: Need to split into two
 NUM_LEDS = 798
-
 
 COMMAND_LC = np.array(list(b'LC'), dtype=np.uint8)
 COMMAND_SN = np.array(list(b'SN'), dtype=np.uint8)
@@ -19,6 +25,35 @@ BLUE = np.array([0, 0, B2], dtype='uint8')
 YELLOW = np.array([B2, B2, 0], dtype='uint8')
 MAGENTA = np.array([B2, 0, B2], dtype='uint8')
 CYAN = np.array([0, B2, B2], dtype='uint8')
+
+# Arduino communication
+BAUD_RATE = 57600
+
+# Serial ports of Teensy devices
+# Find these by running ls /dev/tty.* from command line
+# SERIAL_PORTS = {
+#     49: '/dev/cu.usbmodem12745401',
+#     50: '/dev/cu.usbmodem6862001'
+# }
+# Usually, 
+#  - TEENSY1 is on usb port 1275401
+#  - TEENSY2 is on usb port 6862001
+# Raspberry Pi uses the /dev/ttyACM* naming scheme 
+# Find these by running ls /dev/tty.* from command line
+SERIAL_PORTS = [
+    '/dev/ttyACM0',
+    '/dev/ttyACM1'
+]
+# Usually (but not always),
+#  - TEENSY1 is on usb port '/dev/ttyACM1'
+#  - TEENSY2 is on usb port '/dev/ttyACM0'
+
+
+# LEDs per strip
+LEDS_PER_STRIP = {
+    'TEENSY1': [100, 100, 98, 100, 100, 100, 100, 100],
+    'TEENSY2': [99, 99, 99, 100, 100, 100, 100, 98]
+}
 
 
 def set_led(i, rgb):
@@ -95,3 +130,45 @@ def clear_all_leds():
 def show_now():
     """Command SN"""
     return COMMAND_SN
+
+
+class Display1593():
+
+    def __init__(
+        self, 
+        ports=SERIAL_PORTS, 
+        baud_rate=BAUD_RATE, 
+        leds_per_strip=LEDS_PER_STRIP
+    ):
+        self.ports = ports
+        self.baud_rate = baud_rate
+        self.first_led_of_strip = {
+            name: np.cumsum([0] + leds) for name, leds in leds_per_strip.items()
+        }
+        self.max_leds_per_strip = max(chain.from_iterable(leds_per_strip.values()))
+        self.leds_per_strip = {
+            name: np.array(leds) for name, leds in leds_per_strip.items()
+        }
+
+    def connect(self):
+        connections = {}
+        for port in self.ports:
+            conn = serial.Serial(port, baudrate=self.baud_rate)
+            #logger.info(f'Connected to port {port}.')
+
+            status, message = connect_to_arduino(conn)
+            if status == 0:
+                worker_name = message
+            else:
+                raise Exception(message)
+            #logger.info(f"Hello from: {worker_name}")
+            connections[worker_name] = conn
+
+        self.connections = connections
+
+    def disconnect(self):
+        for name, conn in self.connections.items():
+            conn.close()
+            #logger.info(f'Closed connection to {name}.')
+
+        
