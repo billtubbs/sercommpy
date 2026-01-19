@@ -196,8 +196,15 @@ def main():
     logger.info('='*35)
     logger.info(f'{filename} started.')
     with Display1593() as dis:
-        breakpoint()
         dis.clear_all()
+        dis.set_led(0, RED)
+        dis.set_led(797, BLUE)
+        dis.set_led(798, RED)
+        dis.set_led(1592, BLUE)
+        leds = [1, 2, 3]
+        rgb_array = np.stack([GREEN, CYAN, MAGENTA])
+        dis.set_leds(leds, rgb_array)
+        breakpoint()
         dis.show_now()
     
     logger.info(f'{filename} ended.')
