@@ -11,18 +11,6 @@ import os
 import time
 
 
-logger = logging.getLogger(__name__)
-LOG_FORMAT = '%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s'
-filename = os.path.basename(__file__)
-os.path.splitext(os.path.basename(__file__))
-logging.basicConfig(
-    filename=os.path.splitext(filename)[0] + '.log',
-    level=logging.INFO,
-    datefmt="%Y-%m-%d %H:%M:%S",
-    format=LOG_FORMAT
-)
-
-
 def move_pointer_commands(i1, i2):
     return [
         np.array(list(b'L1') + [0, i1, 0, 0, 0], dtype="uint8"),
@@ -207,12 +195,11 @@ def run_test(board, ser):
 def main():
     logger.info('='*35)
     logger.info(f'{filename} started.')
-    connections = open_serial_connections(SERIAL_PORTS)
-    for board in ['TEENSY1', 'TEENSY2']:
-        run_test(board, connections[board])
-
-    #manual_testing(connections['TEENSY1'])
-    close_serial_connections(connections)
+    with Display1593() as dis:
+        breakpoint()
+        dis.clear_all()
+        dis.show_now()
+    
     logger.info(f'{filename} ended.')
 
 

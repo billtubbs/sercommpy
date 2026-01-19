@@ -1,6 +1,8 @@
+import os
+import logging
+import serial
 from itertools import cycle, chain
 from collections import deque
-import serial
 
 import numpy as np
 from numba import jit, types
@@ -9,6 +11,17 @@ from serial_comm.serial_comm import (
     connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
 )
 
+# Set up logging
+logger = logging.getLogger(__name__)
+LOG_FORMAT = '%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s'
+filename = os.path.basename(__file__)
+os.path.splitext(os.path.basename(__file__))
+logging.basicConfig(
+    filename=os.path.splitext(filename)[0] + '.log',
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S",
+    format=LOG_FORMAT
+)
 
 # TODO: Need to split into two
 NUM_LEDS = 798
@@ -122,16 +135,6 @@ def set_all_leds_one_colour(rgb):
     return np.array((67, 65, *rgb), dtype=np.uint8)
 
 
-def clear_all_leds():
-    """Command LC"""
-    return COMMAND_LC
-
-
-def show_now():
-    """Command SN"""
-    return COMMAND_SN
-
-
 class Display1593():
 
     def __init__(
@@ -154,21 +157,39 @@ class Display1593():
         connections = {}
         for port in self.ports:
             conn = serial.Serial(port, baudrate=self.baud_rate)
-            #logger.info(f'Connected to port {port}.')
+            logger.info(f'Connected to port {port}.')
 
             status, message = connect_to_arduino(conn)
             if status == 0:
                 worker_name = message
             else:
                 raise Exception(message)
-            #logger.info(f"Hello from: {worker_name}")
+            logger.info(f"Hello from: {worker_name}")
             connections[worker_name] = conn
 
         self.connections = connections
 
+    def clear_all(self):
+        for name, ser in self.connections.items():
+            send_data_to_arduino(ser, COMMAND_LC)
+        logger.info(f'clear_all called.')
+    
+    def show_now(self):
+        for name, ser in self.connections.items():
+            send_data_to_arduino(ser, COMMAND_SN)
+        logger.info(f'show_now called.')
+
     def disconnect(self):
         for name, conn in self.connections.items():
             conn.close()
-            #logger.info(f'Closed connection to {name}.')
+            logger.info(f'Closed connection to {name}.')
 
-        
+    def __enter__(self):
+        """Enter context manager method"""
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager method"""
+        self.disconnect()
+        return False
