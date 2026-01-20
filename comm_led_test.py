@@ -54,6 +54,8 @@ def move_pointer_commands(i1, i2):
 
 def manual_testing(ser):
 
+    import pygame
+
     status, message = connect_to_arduino(ser)
     if status == 0:
         worker_name = message
