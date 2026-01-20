@@ -1,7 +1,8 @@
 import os
+import time
 import logging
 import serial
-from itertools import cycle, chain
+from itertools import cycle, chain, pairwise
 from collections import deque
 
 import numpy as np
@@ -23,14 +24,11 @@ logging.basicConfig(
     format=LOG_FORMAT
 )
 
-# TODO: Need to split into two
-NUM_LEDS = 798
-
-COMMAND_LC = np.array(list(b'LC'), dtype=np.uint8)
+COMMAND_LC = np.array(list(b'LC'), dtype=np.uint8)  # implemented
 COMMAND_SN = np.array(list(b'SN'), dtype=np.uint8)
 
 B2 = 32
-BLACK = np.ones(3, dtype='uint8')
+BLACK = np.zeros(3, dtype='uint8')
 WHITE = np.full_like(BLACK, B2)
 RED = np.array([B2, 0, 0], dtype='uint8')
 GREEN = np.array([0, B2, 0], dtype='uint8')
@@ -84,56 +82,106 @@ def make_idx_array(leds):
     return idx
 
 
-def _board_leds(leds, rgb_array, led_idx):
+@jit(nopython=True)
+def _board_leds(leds, led_idx):
     """Filter led ids into separate lists for each board."""
-    board_leds = [[], []]
-    rgb_arrays = [[], []]
-    for i, led in enumerate(leds):
-        if led < led_idx[0]:
-            board_leds[0].append(led)
-            rgb_arrays[0].append(rgb_array[i])
-        elif led < led_idx[1]:
-            board_leds[1].append(led - led_idx[0])
-            rgb_arrays[1].append(rgb_array[i])
+    n = len(leds)
+
+    # Pre-allocate with maximum possible size
+    board_leds_0 = np.empty(n, dtype=leds.dtype)
+    board_leds_1 = np.empty(n, dtype=leds.dtype)
+
+    # Fill arrays and track actual sizes
+    idx0 = 0
+    idx1 = 0
+    for i in range(n):
+        led = leds[i]
+        if led < led_idx[1]:
+            board_leds_0[idx0] = led - led_idx[0]
+            idx0 += 1
+        elif led < led_idx[2]:
+            board_leds_1[idx1] = led - led_idx[1]
+            idx1 += 1
         else:
             raise ValueError("invalid led id")
-    for i, arrays in enumerate(rgb_arrays):
-        if len(arrays) > 0:
-            rgb_arrays[i] = np.stack(arrays)
+
+    # Trim to actual sizes
+    board_leds_0 = board_leds_0[:idx0]
+    board_leds_1 = board_leds_1[:idx1]
+
+    return board_leds_0, board_leds_1
+
+
+@jit(nopython=True)
+def _board_leds_with_rgb(leds, rgb_array, led_idx):
+    """Filter led ids into separate lists for each board."""
+    n = len(leds)
+
+    # Pre-allocate with maximum possible size
+    board_leds_0 = np.empty(n, dtype=leds.dtype)
+    board_leds_1 = np.empty(n, dtype=leds.dtype)
+    rgb_arrays_0 = np.empty((n, 3), dtype=np.uint8)
+    rgb_arrays_1 = np.empty((n, 3), dtype=np.uint8)
+
+    # Fill arrays and track actual sizes
+    idx0 = 0
+    idx1 = 0
+    for i in range(n):
+        led = leds[i]
+        if led < led_idx[1]:
+            board_leds_0[idx0] = led - led_idx[0]
+            rgb_arrays_0[idx0] = rgb_array[i]
+            idx0 += 1
+        elif led < led_idx[2]:
+            board_leds_1[idx1] = led - led_idx[1]
+            rgb_arrays_1[idx1] = rgb_array[i]
+            idx1 += 1
         else:
-            rgb_arrays[i] = np.empty((0, 3), dtype='uint8')
-    return board_leds, rgb_arrays
+            raise ValueError("invalid led id")
+
+    # Trim to actual sizes
+    board_leds_0 = board_leds_0[:idx0]
+    board_leds_1 = board_leds_1[:idx1]
+    rgb_arrays_0 = rgb_arrays_0[:idx0]
+    rgb_arrays_1 = rgb_arrays_1[:idx1]
+
+    return board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1
 
 
-def set_all_leds(rgb_array):
-    """Command LA"""
-    assert rgb_array.shape[0] == NUM_LEDS
-    assert rgb_array.shape[1] == 3
-    return np.concatenate(
-        [
-            (76, 65),
-            rgb_array.flatten()
-        ]
-    ).astype(np.uint8)
+@jit(nopython=True)
+def calc_expected_response(cmd):
+    """
+    Calculate the expected response of the Arduino to the command. 
 
+    Args:
+        cmd: NumPy array of uint8 values
+        
+    Returns:
+        NumPy array of 6 uint8 values:
+        - Bytes 0-1: length of cmd (16-bit big-endian)
+        - Bytes 2-5: sum of cmd values (32-bit big-endian)
+    """
+    expected_response = np.empty(6, dtype=np.uint8)
 
-def set_leds_one_colour(leds, rgb):
-    """Command CN"""
-    n = leds.shape[0]
-    assert len(rgb) == 3
-    idx = make_idx_array(leds)
-    return np.concatenate(
-        [
-            (67, 78, n // 256 % 256, n % 256, *rgb),
-            idx.flatten()
-        ]
-    ).astype(np.uint8)
+    # Get the length of cmd
+    cmd_length = len(cmd)
 
+    # Bytes 0-1: length as 16-bit big-endian (high byte first)
+    expected_response[0] = (cmd_length >> 8) & 0xFF  # High byte
+    expected_response[1] = cmd_length & 0xFF         # Low byte
 
-def set_all_leds_one_colour(rgb):
-    """Command CA"""
-    assert len(rgb) == 3
-    return np.array((67, 65, *rgb), dtype=np.uint8)
+    # Calculate sum of all values in cmd
+    cmd_sum = np.uint32(0)
+    for i in range(len(cmd)):
+        cmd_sum += cmd[i]
+
+    # Bytes 2-5: sum as 32-bit big-endian (high byte first)
+    expected_response[2] = (cmd_sum >> 24) & 0xFF  # Highest byte
+    expected_response[3] = (cmd_sum >> 16) & 0xFF
+    expected_response[4] = (cmd_sum >> 8) & 0xFF
+    expected_response[5] = cmd_sum & 0xFF          # Lowest byte
+    
+    return expected_response
 
 
 class Display1593():
@@ -147,24 +195,25 @@ class Display1593():
         self.ports = ports
         self.baud_rate = baud_rate
         self.board_names = list(number_of_leds.keys())
-        self.leds_per_board = list(number_of_leds.values())
-        self.first_led_of_strip = list(np.cumsum([0] + self.leds_per_board))
-        self.led_idx = list(np.cumsum(self.leds_per_board))
+        self.leds_per_board = np.fromiter(number_of_leds.values(), dtype='int32')
+        self.led_idx = np.concatenate(
+            [np.zeros(1, dtype='int32'), np.cumsum(self.leds_per_board)]
+        )
+        self.n_leds = self.led_idx[-1]
         self._connections = []
 
     def connect(self):
         connections = {}
         for port in self.ports:
-            conn = serial.Serial(port, baudrate=self.baud_rate)
-            logger.info(f'Connected to port {port}.')
-
-            status, message = connect_to_arduino(conn)
+            ser = serial.Serial(port, baudrate=self.baud_rate)
+            status, message = connect_to_arduino(ser)
             if status == 0:
+                logger.info(f'Connected to port {port}.')
                 worker_name = message
             else:
                 raise Exception(message)
             logger.info(f"Hello from: {worker_name}")
-            connections[worker_name] = conn
+            connections[worker_name] = ser
 
         if set(connections.keys()) != set(self.board_names):
             raise ValueError(
@@ -177,61 +226,141 @@ class Display1593():
         for name in self.board_names:        
             self._connections.append(connections[name])
 
+    def check_response(self, ser, cmd, timeout_after=1):
+        expected_response = calc_expected_response(cmd)
+        waiting = True
+        timeout_time = time.time() + timeout_after
+        while waiting:
+            if ser.in_waiting > 0:
+                waiting = False
+                response = receive_data_from_arduino(ser)
+                if np.array_equal(response, expected_response):
+                    logger.info("Resp rec'd")
+                elif np.array_equal(response[:2], [0, 0]):
+                    logger.info(f"Debug msg: {bytes(response[2:]).decode()}")
+                else:
+                    logger.info(
+                        f"Resp invalid, expected {expected_response}, got {response}"
+                    )
+                    break
+            if time.time() > timeout_time:
+                logger.info(f'Timeout')
+                break
+
     def clear_all(self):
-        # Command LC
-        for ser in self._connections:
-            send_data_to_arduino(ser, COMMAND_LC)
         logger.info(f'Method clear_all called.')
+        cmd = COMMAND_LC
+        for ser in self._connections:
+            send_data_to_arduino(ser, cmd)
+        for ser in self._connections:
+            self.check_response(ser, cmd)
 
     def set_led(self, i, rgb):
-        if i < 0:
+        logger.info(f'Method set_led called.')
+        if i < self.led_idx[0]:
             raise ValueError("invalid led id")
         assert len(rgb) == 3
-        if i < self.led_idx[0]:
+        if i < self.led_idx[1]:
             led_id = i
-            conn = self._connections[0]
-        elif i < self.led_idx[1]:
-            led_id = i - self.led_idx[0]
-            conn = self._connections[1]
+            ser = self._connections[0]
+        elif i < self.led_idx[2]:
+            led_id = i - self.led_idx[1]
+            ser = self._connections[1]
         else:
             raise ValueError("invalid led id")
-        # Command L1
+        # Command L1 - implemented
         cmd = np.array(
             (76, 49, led_id // 256 % 256, led_id % 256, *rgb), dtype=np.uint8
         )
-        send_data_to_arduino(conn, cmd)
-        logger.info(f'Method set_led called.')
+        send_data_to_arduino(ser, cmd)
+        self.check_response(ser, cmd)
 
     def set_leds(self, leds, rgb_array):
         assert rgb_array.shape[1] == 3
-        board_leds, rgb_arrays = _board_leds(leds, rgb_array, self.led_idx)
-        for leds, rgb_array, conn in zip(board_leds, rgb_arrays, self._connections):
+        leds = np.array(leds, dtype='int32')
+        logger.info(f'Method set_leds called with {leds.shape[0]} leds.')
+        board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1 = _board_leds_with_rgb(
+            leds, rgb_array, self.led_idx
+        )
+        board_leds = [board_leds_0, board_leds_1]
+        rgb_arrays = [rgb_arrays_0, rgb_arrays_1]
+        cmds_sent = []
+        for leds, rgb_array, ser in zip(board_leds, rgb_arrays, self._connections):
             if len(leds) == 0:
                 continue
             n = rgb_array.shape[0]
             idx = make_idx_array(np.array(leds, dtype='int32'))
-            # Command LN
+            # Command LN - implemented
             cmd = np.concatenate(
                 [
                     (76, 78, n // 256 % 256, n % 256),
                     np.hstack((idx, rgb_array)).flatten()
                 ]
             ).astype(np.uint8)
-            send_data_to_arduino(conn, cmd)
-        logger.info(f'Method set_leds called with {n} leds.')
+            send_data_to_arduino(ser, cmd)
+            cmds_sent.append(cmd)
+        for ser, cmd in zip(self._connections, cmds_sent):
+            self.check_response(ser, cmd)
+
+    def set_leds_one_colour(self, leds, rgb):
+        assert len(rgb) == 3
+        leds = np.array(leds, dtype='int32')
+        logger.info(f'Method set_leds_one_colour called with {leds.shape[0]} leds.')
+        board_leds_0, board_leds_1 = _board_leds(leds, self.led_idx)
+        board_leds = [board_leds_0, board_leds_1]
+        cmds_sent = []
+        for leds, ser in zip(board_leds, self._connections):
+            n = leds.shape[0]
+            idx = make_idx_array(leds)
+            # Command CN - implemented
+            cmd = np.concatenate(
+                [(67, 78, n // 256 % 256, n % 256, *rgb), idx.flatten()]
+            ).astype(np.uint8)
+            send_data_to_arduino(ser, cmd)
+            cmds_sent.append(cmd)
+        for ser, cmd in zip(self._connections, cmds_sent):
+            self.check_response(ser, cmd)
+
+    def set_all_leds(self, rgb_array):
+        logger.info(f'Method set_all_leds called.')
+        assert rgb_array.shape == (self.n_leds, 3)
+        cmds_sent = []
+        for (i, j), ser in zip(pairwise(self.led_idx), self._connections):
+            # Command LA - implemented
+            cmd = np.concatenate(
+                [(76, 65), rgb_array[i:j].flatten()]
+            ).astype(np.uint8)
+            send_data_to_arduino(ser, cmd)
+            cmds_sent.append(cmd)
+        for ser, cmd in zip(self._connections, cmds_sent):
+            breakpoint()
+            self.check_response(ser, cmd)
+
+    def set_all_leds_one_colour(self, rgb):
+        logger.info(f'Method set_all_leds_one_colour called.')
+        assert len(rgb) == 3
+        # Command CA - implemented
+        cmd = np.array((67, 65, *rgb), dtype=np.uint8)
+        for ser in self._connections:
+            send_data_to_arduino(ser, cmd)
+        for ser in self._connections:
+            self.check_response(ser, cmd)
 
     def show_now(self):
-        # Command SN
-        # TODO: In future this will be synchronized by comms between boards
-        for ser in self._connections:
-            send_data_to_arduino(ser, COMMAND_SN)
         logger.info(f'Method show_now called.')
+        # Command SN - implemented
+        # TODO: In future this will be synchronized by comms between boards
+        cmd = COMMAND_SN
+        for ser in self._connections:
+            send_data_to_arduino(ser, cmd)
+        for ser in self._connections:
+            self.check_response(ser, cmd)
 
     def disconnect(self):
         while len(self._connections) > 0:
-            conn = self._connections.pop()
-            conn.close()
-            logger.info(f'Closed connection to {conn.port}.')
+            ser = self._connections.pop()
+            ser.close()
+            logger.info(f'Closed connection to {ser.port}.')
 
     def __enter__(self):
         """Enter context manager method"""
