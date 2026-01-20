@@ -211,6 +211,7 @@ class Display1593():
                 logger.info(f'Connected to port {port}.')
                 worker_name = message
             else:
+                logger.debug(f'Connection to port {port} failed.')
                 raise Exception(message)
             logger.info(f"Hello from: {worker_name}")
             connections[worker_name] = ser
@@ -333,7 +334,6 @@ class Display1593():
             send_data_to_arduino(ser, cmd)
             cmds_sent.append(cmd)
         for ser, cmd in zip(self._connections, cmds_sent):
-            breakpoint()
             self.check_response(ser, cmd)
 
     def set_all_leds_one_colour(self, rgb):
