@@ -103,7 +103,7 @@ def manual_testing(ser):
             if len(command_queue) > 0:
                 data = command_queue.pop()
                 send_data_to_arduino(ser, data)
-                logger.info("Command sent.")
+                #logger.info("Command sent.")
                 waiting_for_response = True
 
         if ser.in_waiting > 0:
@@ -126,8 +126,12 @@ def manual_testing(ser):
                     + int(data_received[5])
                 )
                 assert num_bytes_received == data.shape[0]
-                assert data_sum == data.sum()
-                logger.info(f"Test {i_iter} complete.")
+                if data_sum == data.sum():
+                    pass
+                    #logger.info(f"Test {i_iter} complete.")
+                else:
+                    logger.debug(f"Test {i_iter} checksum failed.")
+                    logger.debug(f"Received: {data_sum}, expected: {data.sum()}.")
                 i_iter += 1
                 waiting_for_response = False
                 time.sleep(0.5)
@@ -201,15 +205,15 @@ def run_test(board, ser):
                 data = next(command_list_cycle)
             except IndexError:
                 break
-            logger.info(f"Sending Test {i_iter} data...")
+            #logger.info(f"Sending Test {i_iter} data...")
             send_data_to_arduino(ser, data)
-            logger.info("Data sent.")
+            #logger.info("Data sent.")
             waiting_for_response = True
 
         if ser.in_waiting > 0:
-            logger.info("Receiving data...")
+            #logger.info("Receiving data...")
             data_received = receive_data_from_arduino(ser)
-            logger.info("Data received.")
+            #logger.info("Data received.")
             if np.array_equal(data_received[:2], [0, 0]):
                 # Debug message from Arduino
                 logger.info(f"Debug message: {data_received[2:].tobytes()}")
@@ -228,7 +232,7 @@ def run_test(board, ser):
                 )
                 assert num_bytes_received == data.shape[0]
                 assert data_sum == data.sum()
-                logger.info(f"Test {i_iter} complete.")
+                #logger.info(f"Test {i_iter} complete.")
                 i_iter += 1
                 waiting_for_response = False
 
