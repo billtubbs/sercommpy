@@ -246,6 +246,7 @@ class Display1593():
                     break
             if time.time() > timeout_time:
                 logger.info(f'Timeout')
+                breakpoint()
                 break
 
     def clear_all(self):
@@ -285,12 +286,12 @@ class Display1593():
         )
         board_leds = [board_leds_0, board_leds_1]
         rgb_arrays = [rgb_arrays_0, rgb_arrays_1]
-        cmds_sent = []
+        cmds_sent = {}
         for leds, rgb_array, ser in zip(board_leds, rgb_arrays, self._connections):
-            if len(leds) == 0:
+            n = leds.shape[0]
+            if n == 0:
                 continue
-            n = rgb_array.shape[0]
-            idx = make_idx_array(np.array(leds, dtype='int32'))
+            idx = make_idx_array(leds)
             # Command LN - implemented
             cmd = np.concatenate(
                 [
@@ -299,8 +300,8 @@ class Display1593():
                 ]
             ).astype(np.uint8)
             send_data_to_arduino(ser, cmd)
-            cmds_sent.append(cmd)
-        for ser, cmd in zip(self._connections, cmds_sent):
+            cmds_sent[ser] = cmd
+        for ser, cmd in cmds_sent.items():
             self.check_response(ser, cmd)
 
     def set_leds_one_colour(self, leds, rgb):
@@ -309,31 +310,33 @@ class Display1593():
         logger.info(f'Method set_leds_one_colour called with {leds.shape[0]} leds.')
         board_leds_0, board_leds_1 = _board_leds(leds, self.led_idx)
         board_leds = [board_leds_0, board_leds_1]
-        cmds_sent = []
+        cmds_sent = {}
         for leds, ser in zip(board_leds, self._connections):
             n = leds.shape[0]
+            if n == 0:
+                continue
             idx = make_idx_array(leds)
             # Command CN - implemented
             cmd = np.concatenate(
                 [(67, 78, n // 256 % 256, n % 256, *rgb), idx.flatten()]
             ).astype(np.uint8)
             send_data_to_arduino(ser, cmd)
-            cmds_sent.append(cmd)
-        for ser, cmd in zip(self._connections, cmds_sent):
+            cmds_sent[ser] = cmd
+        for ser, cmd in cmds_sent.items():
             self.check_response(ser, cmd)
 
     def set_all_leds(self, rgb_array):
         logger.info(f'Method set_all_leds called.')
         assert rgb_array.shape == (self.n_leds, 3)
-        cmds_sent = []
+        cmds_sent = {}
         for (i, j), ser in zip(pairwise(self.led_idx), self._connections):
             # Command LA - implemented
             cmd = np.concatenate(
                 [(76, 65), rgb_array[i:j].flatten()]
             ).astype(np.uint8)
             send_data_to_arduino(ser, cmd)
-            cmds_sent.append(cmd)
-        for ser, cmd in zip(self._connections, cmds_sent):
+            cmds_sent[ser] = cmd
+        for ser, cmd in cmds_sent.items():
             self.check_response(ser, cmd)
 
     def set_all_leds_one_colour(self, rgb):

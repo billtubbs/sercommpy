@@ -48,16 +48,16 @@ def main():
 
         # Test set_leds method
         dis.clear_all()
-        start_led = 0
+        start_led = 650
         colors = [BLACK, RED, GREEN, BLUE, MAGENTA, YELLOW, CYAN]
         rgb_array = np.stack(colors).astype('uint8')
         t_last = time.time()
-        for iter in range(50):
+        for iter in range(2000):
             leds = [(start_led + i) % 1593 for i in range(len(colors))]
             dis.set_leds(leds, rgb_array)
-            dis.show_now()
             while (t_now := time.time()) < t_last + 0.05:
                 pass
+            dis.show_now()
             t_last = t_now
             start_led = (start_led + 1) % 1593
     
