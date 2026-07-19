@@ -202,18 +202,18 @@ class Display1593:
             ser = serial.Serial(port, baudrate=self.baud_rate)
             status, message = connect_to_arduino(ser)
             if status == 0:
-                logger.info(f"Connected to port {port}.")
+                logger.info("Connected to port %s.", port)
                 worker_name = message
             else:
-                logger.debug(f"Connection to port {port} failed.")
+                logger.debug("Connection to port %s failed.", port)
                 raise Exception(message)
-            logger.info(f"Hello from: {worker_name}")
+            logger.info("Hello from: %s", worker_name)
             connections[worker_name] = ser
 
         if set(connections.keys()) != set(self.board_names):
             raise ValueError(
-                f"board name mismatch, expected {self.board_names}, "
-                f"got {list(connections.keys())}"
+                "board name mismatch, expected %s, got %s"
+                % (self.board_names, list(connections.keys()))
             )
 
         # Store connections in same order as expected board names
@@ -233,27 +233,29 @@ class Display1593:
                     # logger.info("Resp rec'd")
                     pass
                 elif np.array_equal(response[:2], [0, 0]):
-                    logger.info(f"Debug msg: {bytes(response[2:]).decode()}")
+                    logger.info("Debug msg: %s", bytes(response[2:]).decode())
                 else:
                     logger.info(
-                        f"Resp invalid, expected {expected_response}, got {response}"
+                        "Resp invalid, expected %s, got %s",
+                        expected_response,
+                        response,
                     )
             if time.time() > timeout_time:
-                logger.info(f"Timeout")
+                logger.info("Timeout")
                 breakpoint()
                 break
 
     def clear_all(self):
-        logger.info(f"Method clear_all.")
+        logger.info("Method clear_all.")
         cmd = COMMAND_LC
         for ser in self._connections:
             send_data_to_arduino(ser, cmd)
         for ser in self._connections:
             self.check_response(ser, cmd)
-        logger.info(f"Method clear_all done.")
+        logger.info("Method clear_all done.")
 
     def set_led(self, i, rgb):
-        logger.info(f"Method set_led.")
+        logger.info("Method set_led.")
         if i < self.led_idx[0]:
             raise ValueError("invalid led id")
         assert len(rgb) == 3
@@ -271,12 +273,12 @@ class Display1593:
         )
         send_data_to_arduino(ser, cmd)
         self.check_response(ser, cmd)
-        logger.info(f"Method set_led done.")
+        logger.info("Method set_led done.")
 
     def set_leds(self, leds, rgb_array):
         assert rgb_array.shape[1] == 3
         leds = np.array(leds, dtype="int32")
-        logger.info(f"Method set_leds with {leds.shape[0]} leds.")
+        logger.info("Method set_leds with %d leds.", leds.shape[0])
         board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1 = (
             _board_leds_with_rgb(leds, rgb_array, self.led_idx)
         )
@@ -305,7 +307,7 @@ class Display1593:
     def set_leds_one_colour(self, leds, rgb):
         assert len(rgb) == 3
         leds = np.array(leds, dtype="int32")
-        logger.info(f"Method set_leds_one_colour with {leds.shape[0]} leds.")
+        logger.info("Method set_leds_one_colour with %d leds." % leds.shape[0])
         board_leds_0, board_leds_1 = _board_leds(leds, self.led_idx)
         board_leds = [board_leds_0, board_leds_1]
         cmds_sent = {}
@@ -324,7 +326,7 @@ class Display1593:
             self.check_response(ser, cmd)
 
     def set_all_leds(self, rgb_array):
-        logger.info(f"Method set_all_leds.")
+        logger.info("Method set_all_leds.")
         assert rgb_array.shape == (self.n_leds, 3)
         cmds_sent = {}
         for (i, j), ser in zip(pairwise(self.led_idx), self._connections):
@@ -338,7 +340,7 @@ class Display1593:
             self.check_response(ser, cmd)
 
     def set_all_leds_one_colour(self, rgb):
-        logger.info(f"Method set_all_leds_one_colour.")
+        logger.info("Method set_all_leds_one_colour.")
         assert len(rgb) == 3
         # Command CA - implemented
         cmd = np.array((67, 65, *rgb), dtype=np.uint8)
@@ -348,7 +350,7 @@ class Display1593:
             self.check_response(ser, cmd)
 
     def show_now(self):
-        logger.info(f"Method show_now.")
+        logger.info("Method show_now.")
         # Command SN - implemented
         # TODO: In future this will be synchronized by comms between boards
         cmd = COMMAND_SN
@@ -361,7 +363,7 @@ class Display1593:
         while len(self._connections) > 0:
             ser = self._connections.pop()
             ser.close()
-            logger.info(f"Closed connection to {ser.port}.")
+            logger.info("Closed connection to %s.", ser.port)
 
     def __enter__(self):
         """Enter context manager method"""
