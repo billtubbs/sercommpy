@@ -9,33 +9,35 @@ import numpy as np
 from numba import jit, types
 
 from serial_comm.serial_comm import (
-    connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
+    connect_to_arduino,
+    send_data_to_arduino,
+    receive_data_from_arduino,
 )
 
 # Set up logging
 logger = logging.getLogger(__name__)
-LOG_FORMAT = '%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s'
+LOG_FORMAT = "%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s"
 filename = os.path.basename(__file__)
 os.path.splitext(os.path.basename(__file__))
 logging.basicConfig(
-    filename=os.path.splitext(filename)[0] + '.log',
+    filename=os.path.splitext(filename)[0] + ".log",
     level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
-    format=LOG_FORMAT
+    format=LOG_FORMAT,
 )
 
-COMMAND_LC = np.array(list(b'LC'), dtype=np.uint8)  # implemented
-COMMAND_SN = np.array(list(b'SN'), dtype=np.uint8)
+COMMAND_LC = np.array(list(b"LC"), dtype=np.uint8)  # implemented
+COMMAND_SN = np.array(list(b"SN"), dtype=np.uint8)
 
 B2 = 32
-BLACK = np.zeros(3, dtype='uint8')
+BLACK = np.zeros(3, dtype="uint8")
 WHITE = np.full_like(BLACK, B2)
-RED = np.array([B2, 0, 0], dtype='uint8')
-GREEN = np.array([0, B2, 0], dtype='uint8')
-BLUE = np.array([0, 0, B2], dtype='uint8')
-YELLOW = np.array([B2, B2, 0], dtype='uint8')
-MAGENTA = np.array([B2, 0, B2], dtype='uint8')
-CYAN = np.array([0, B2, B2], dtype='uint8')
+RED = np.array([B2, 0, 0], dtype="uint8")
+GREEN = np.array([0, B2, 0], dtype="uint8")
+BLUE = np.array([0, 0, B2], dtype="uint8")
+YELLOW = np.array([B2, B2, 0], dtype="uint8")
+MAGENTA = np.array([B2, 0, B2], dtype="uint8")
+CYAN = np.array([0, B2, B2], dtype="uint8")
 
 # Arduino communication
 BAUD_RATE = 57600
@@ -46,39 +48,30 @@ BAUD_RATE = 57600
 #     49: '/dev/cu.usbmodem12745401',
 #     50: '/dev/cu.usbmodem6862001'
 # }
-# Usually, 
+# Usually,
 #  - TEENSY1 is on usb port 1275401
 #  - TEENSY2 is on usb port 6862001
-# Raspberry Pi uses the /dev/ttyACM* naming scheme 
+# Raspberry Pi uses the /dev/ttyACM* naming scheme
 # Find these by running ls /dev/tty.* from command line
-SERIAL_PORTS = [
-    '/dev/ttyACM0',
-    '/dev/ttyACM1'
-]
+SERIAL_PORTS = ["/dev/ttyACM0", "/dev/ttyACM1"]
 # Usually (but not always),
 #  - TEENSY1 is on usb port '/dev/ttyACM1'
 #  - TEENSY2 is on usb port '/dev/ttyACM0'
 
 # LED setup
-NUMBER_OF_LEDS = {
-    'TEENSY1': 798,
-    'TEENSY2': 795
-}
+NUMBER_OF_LEDS = {"TEENSY1": 798, "TEENSY2": 795}
 
 
 @jit(
-    [
-        types.uint8[:, :](types.int32[:]), 
-        types.uint8[:, :](types.int64[:])
-    ], 
-    nopython=True
+    [types.uint8[:, :](types.int32[:]), types.uint8[:, :](types.int64[:])],
+    nopython=True,
 )
 def make_idx_array(leds):
     idx = np.empty((leds.shape[0], 2), dtype=np.uint8)
     for i in range(leds.shape[0]):
         idx[i, 0] = leds[i] // 256 % 256
         idx[i, 1] = leds[i] % 256
-    #idx = np.array([(i // 256 % 256, i % 256) for i in leds], dtype=np.uint8)
+    # idx = np.array([(i // 256 % 256, i % 256) for i in leds], dtype=np.uint8)
     return idx
 
 
@@ -151,11 +144,11 @@ def _board_leds_with_rgb(leds, rgb_array, led_idx):
 @jit(nopython=True)
 def calc_expected_response(cmd):
     """
-    Calculate the expected response of the Arduino to the command. 
+    Calculate the expected response of the Arduino to the command.
 
     Args:
         cmd: NumPy array of uint8 values
-        
+
     Returns:
         NumPy array of 6 uint8 values:
         - Bytes 0-1: length of cmd (16-bit big-endian)
@@ -168,7 +161,7 @@ def calc_expected_response(cmd):
 
     # Bytes 0-1: length as 16-bit big-endian (high byte first)
     expected_response[0] = (cmd_length >> 8) & 0xFF  # High byte
-    expected_response[1] = cmd_length & 0xFF         # Low byte
+    expected_response[1] = cmd_length & 0xFF  # Low byte
 
     # Calculate sum of all values in cmd
     cmd_sum = np.uint32(0)
@@ -179,25 +172,26 @@ def calc_expected_response(cmd):
     expected_response[2] = (cmd_sum >> 24) & 0xFF  # Highest byte
     expected_response[3] = (cmd_sum >> 16) & 0xFF
     expected_response[4] = (cmd_sum >> 8) & 0xFF
-    expected_response[5] = cmd_sum & 0xFF          # Lowest byte
-    
+    expected_response[5] = cmd_sum & 0xFF  # Lowest byte
+
     return expected_response
 
 
-class Display1593():
-
+class Display1593:
     def __init__(
         self,
         ports=SERIAL_PORTS,
         baud_rate=BAUD_RATE,
-        number_of_leds=NUMBER_OF_LEDS
+        number_of_leds=NUMBER_OF_LEDS,
     ):
         self.ports = ports
         self.baud_rate = baud_rate
         self.board_names = list(number_of_leds.keys())
-        self.leds_per_board = np.fromiter(number_of_leds.values(), dtype='int32')
+        self.leds_per_board = np.fromiter(
+            number_of_leds.values(), dtype="int32"
+        )
         self.led_idx = np.concatenate(
-            [np.zeros(1, dtype='int32'), np.cumsum(self.leds_per_board)]
+            [np.zeros(1, dtype="int32"), np.cumsum(self.leds_per_board)]
         )
         self.n_leds = self.led_idx[-1]
         self._connections = []
@@ -208,10 +202,10 @@ class Display1593():
             ser = serial.Serial(port, baudrate=self.baud_rate)
             status, message = connect_to_arduino(ser)
             if status == 0:
-                logger.info(f'Connected to port {port}.')
+                logger.info(f"Connected to port {port}.")
                 worker_name = message
             else:
-                logger.debug(f'Connection to port {port} failed.')
+                logger.debug(f"Connection to port {port} failed.")
                 raise Exception(message)
             logger.info(f"Hello from: {worker_name}")
             connections[worker_name] = ser
@@ -224,7 +218,7 @@ class Display1593():
 
         # Store connections in same order as expected board names
         self._connections = []
-        for name in self.board_names:        
+        for name in self.board_names:
             self._connections.append(connections[name])
 
     def check_response(self, ser, cmd, timeout_after=1):
@@ -236,7 +230,7 @@ class Display1593():
                 waiting = False
                 response = receive_data_from_arduino(ser)
                 if np.array_equal(response, expected_response):
-                    #logger.info("Resp rec'd")
+                    # logger.info("Resp rec'd")
                     pass
                 elif np.array_equal(response[:2], [0, 0]):
                     logger.info(f"Debug msg: {bytes(response[2:]).decode()}")
@@ -245,21 +239,21 @@ class Display1593():
                         f"Resp invalid, expected {expected_response}, got {response}"
                     )
             if time.time() > timeout_time:
-                logger.info(f'Timeout')
+                logger.info(f"Timeout")
                 breakpoint()
                 break
 
     def clear_all(self):
-        logger.info(f'Method clear_all.')
+        logger.info(f"Method clear_all.")
         cmd = COMMAND_LC
         for ser in self._connections:
             send_data_to_arduino(ser, cmd)
         for ser in self._connections:
             self.check_response(ser, cmd)
-        logger.info(f'Method clear_all done.')
+        logger.info(f"Method clear_all done.")
 
     def set_led(self, i, rgb):
-        logger.info(f'Method set_led.')
+        logger.info(f"Method set_led.")
         if i < self.led_idx[0]:
             raise ValueError("invalid led id")
         assert len(rgb) == 3
@@ -277,19 +271,21 @@ class Display1593():
         )
         send_data_to_arduino(ser, cmd)
         self.check_response(ser, cmd)
-        logger.info(f'Method set_led done.')
+        logger.info(f"Method set_led done.")
 
     def set_leds(self, leds, rgb_array):
         assert rgb_array.shape[1] == 3
-        leds = np.array(leds, dtype='int32')
-        logger.info(f'Method set_leds with {leds.shape[0]} leds.')
-        board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1 = _board_leds_with_rgb(
-            leds, rgb_array, self.led_idx
+        leds = np.array(leds, dtype="int32")
+        logger.info(f"Method set_leds with {leds.shape[0]} leds.")
+        board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1 = (
+            _board_leds_with_rgb(leds, rgb_array, self.led_idx)
         )
         board_leds = [board_leds_0, board_leds_1]
         rgb_arrays = [rgb_arrays_0, rgb_arrays_1]
         cmds_sent = {}
-        for leds, rgb_array, ser in zip(board_leds, rgb_arrays, self._connections):
+        for leds, rgb_array, ser in zip(
+            board_leds, rgb_arrays, self._connections
+        ):
             n = leds.shape[0]
             if n == 0:
                 continue
@@ -298,7 +294,7 @@ class Display1593():
             cmd = np.concatenate(
                 [
                     (76, 78, n // 256 % 256, n % 256),
-                    np.hstack((idx, rgb_array)).flatten()
+                    np.hstack((idx, rgb_array)).flatten(),
                 ]
             ).astype(np.uint8)
             send_data_to_arduino(ser, cmd)
@@ -308,8 +304,8 @@ class Display1593():
 
     def set_leds_one_colour(self, leds, rgb):
         assert len(rgb) == 3
-        leds = np.array(leds, dtype='int32')
-        logger.info(f'Method set_leds_one_colour with {leds.shape[0]} leds.')
+        leds = np.array(leds, dtype="int32")
+        logger.info(f"Method set_leds_one_colour with {leds.shape[0]} leds.")
         board_leds_0, board_leds_1 = _board_leds(leds, self.led_idx)
         board_leds = [board_leds_0, board_leds_1]
         cmds_sent = {}
@@ -328,21 +324,21 @@ class Display1593():
             self.check_response(ser, cmd)
 
     def set_all_leds(self, rgb_array):
-        logger.info(f'Method set_all_leds.')
+        logger.info(f"Method set_all_leds.")
         assert rgb_array.shape == (self.n_leds, 3)
         cmds_sent = {}
         for (i, j), ser in zip(pairwise(self.led_idx), self._connections):
             # Command LA - implemented
-            cmd = np.concatenate(
-                [(76, 65), rgb_array[i:j].flatten()]
-            ).astype(np.uint8)
+            cmd = np.concatenate([(76, 65), rgb_array[i:j].flatten()]).astype(
+                np.uint8
+            )
             send_data_to_arduino(ser, cmd)
             cmds_sent[ser] = cmd
         for ser, cmd in cmds_sent.items():
             self.check_response(ser, cmd)
 
     def set_all_leds_one_colour(self, rgb):
-        logger.info(f'Method set_all_leds_one_colour.')
+        logger.info(f"Method set_all_leds_one_colour.")
         assert len(rgb) == 3
         # Command CA - implemented
         cmd = np.array((67, 65, *rgb), dtype=np.uint8)
@@ -352,7 +348,7 @@ class Display1593():
             self.check_response(ser, cmd)
 
     def show_now(self):
-        logger.info(f'Method show_now.')
+        logger.info(f"Method show_now.")
         # Command SN - implemented
         # TODO: In future this will be synchronized by comms between boards
         cmd = COMMAND_SN
@@ -365,7 +361,7 @@ class Display1593():
         while len(self._connections) > 0:
             ser = self._connections.pop()
             ser.close()
-            logger.info(f'Closed connection to {ser.port}.')
+            logger.info(f"Closed connection to {ser.port}.")
 
     def __enter__(self):
         """Enter context manager method"""
