@@ -8,20 +8,22 @@ from serial_comm.serial_comm import (
     receive_data_from_arduino,
 )
 from display1593 import *
-import logging
 import os
 import time
 
 
 def main():
     logger.info("=" * 35)
+    filename = os.path.basename(__file__)
     logger.info(f"{filename} started.")
     with Display1593() as dis:
         dis.set_led(0, RED)
 
-        # Test clear_all method
-        for _ in range(10):
+        for _ in range(1):
+            # Test clear_all method
             dis.clear_all()
+
+            # Test show_now method
             dis.show_now()
 
             # Test set_led method

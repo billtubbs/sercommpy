@@ -28,7 +28,7 @@ writable_uint8_array = types.Array(types.uint8, 1, 'C')
 def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
     # Wait for the initial hello message from the Arduino
     t0 = time.time()
-    while (time.time() - t0) < timeout_time:
+    while True:
         if ser.in_waiting > 0:
             data_received = receive_data_from_arduino(ser)
             if np.array_equal(data_received[:2], [0, 0]):
@@ -43,6 +43,7 @@ def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
                 status, message = 2, "No hello message in data received"
         if (time.time() - t0) >= timeout_time:
             status, message = 1, "Timeout"
+            break
     return status, message
 
 
