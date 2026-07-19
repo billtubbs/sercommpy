@@ -2,8 +2,7 @@ import os
 import time
 import logging
 import serial
-from itertools import cycle, chain, pairwise
-from collections import deque
+from itertools import pairwise
 
 import numpy as np
 from numba import jit, types
