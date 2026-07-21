@@ -14,11 +14,11 @@ from serial_comm.serial_comm import (
 )
 
 # Numba array types
-readonly_uint8_array = types.Array(types.uint8, 1, 'C', readonly=True)
-writable_uint8_array = types.Array(types.uint8, 1, 'C')
-int32_array = types.Array(types.int32, 1, 'C')
-int32_array_1d = types.Array(types.int32, 1, 'C')
-uint8_array_2d = types.Array(types.uint8, 2, 'C')
+readonly_uint8_array = types.Array(types.uint8, 1, "C", readonly=True)
+writable_uint8_array = types.Array(types.uint8, 1, "C")
+int32_array = types.Array(types.int32, 1, "C")
+int32_array_1d = types.Array(types.int32, 1, "C")
+uint8_array_2d = types.Array(types.uint8, 2, "C")
 
 
 # Set up logging
@@ -71,7 +71,8 @@ NUMBER_OF_LEDS = {"TEENSY1": 798, "TEENSY2": 795}
 
 @jit(
     [types.uint8[:, :](types.int32[:]), types.uint8[:, :](types.int64[:])],
-    nopython=True, cache=True
+    nopython=True,
+    cache=True,
 )
 def make_idx_array(leds):
     idx = np.empty((leds.shape[0], 2), dtype=np.uint8)
@@ -83,8 +84,9 @@ def make_idx_array(leds):
 
 
 @jit(
-    [types.Tuple((int32_array, int32_array))(int32_array, int32_array)], 
-    nopython=True, cache=True
+    [types.Tuple((int32_array, int32_array))(int32_array, int32_array)],
+    nopython=True,
+    cache=True,
 )
 def _board_leds(leds, led_idx):
     """Filter led ids into separate lists for each board."""
@@ -119,9 +121,11 @@ return_type = types.Tuple(
     (int32_array_1d, int32_array_1d, uint8_array_2d, uint8_array_2d)
 )
 
+
 @jit(
     [return_type(int32_array_1d, uint8_array_2d, int32_array_1d)],
-    nopython=True, cache=True
+    nopython=True,
+    cache=True,
 )
 def _board_leds_with_rgb(leds, rgb_array, led_idx):
     """Filter led ids into separate lists for each board."""
@@ -159,9 +163,12 @@ def _board_leds_with_rgb(leds, rgb_array, led_idx):
 
 
 @jit(
-    [writable_uint8_array(readonly_uint8_array), 
-     writable_uint8_array(writable_uint8_array)], 
-    nopython=True, cache=True
+    [
+        writable_uint8_array(readonly_uint8_array),
+        writable_uint8_array(writable_uint8_array),
+    ],
+    nopython=True,
+    cache=True,
 )
 def calc_expected_response(cmd):
     """

@@ -12,7 +12,7 @@ dis.connect()
 N_FRAMES = 20
 data = []
 for col in range(N_FRAMES):
-   data.append(np.full((1593, 3), col, dtype="uint8"))
+    data.append(np.full((1593, 3), col, dtype="uint8"))
 
 display_times = []
 t0 = time.time()

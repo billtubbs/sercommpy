@@ -3,7 +3,9 @@ from collections import deque
 import numpy as np
 import serial
 from serial_comm.serial_comm import (
-    connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
+    connect_to_arduino,
+    send_data_to_arduino,
+    receive_data_from_arduino,
 )
 from display1593 import *
 import logging
@@ -12,14 +14,14 @@ import time
 
 
 logger = logging.getLogger(__name__)
-LOG_FORMAT = '%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s'
+LOG_FORMAT = "%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s"
 filename = os.path.basename(__file__)
 os.path.splitext(os.path.basename(__file__))
 logging.basicConfig(
-    filename=os.path.splitext(filename)[0] + '.log',
+    filename=os.path.splitext(filename)[0] + ".log",
     level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
-    format=LOG_FORMAT
+    format=LOG_FORMAT,
 )
 
 BAUD_RATE = 57600
@@ -30,27 +32,23 @@ BAUD_RATE = 57600
 #     49: '/dev/cu.usbmodem12745401',
 #     50: '/dev/cu.usbmodem6862001'
 # }
-# Usually, 
+# Usually,
 #  - TEENSY1 is on usb port 1275401
 #  - TEENSY2 is on usb port 6862001
-# Raspberry Pi uses the /dev/ttyACM* naming scheme 
+# Raspberry Pi uses the /dev/ttyACM* naming scheme
 # Find these by running ls /dev/tty.* from command line
-SERIAL_PORTS = [
-    '/dev/ttyACM0',
-    '/dev/ttyACM1'
-]
+SERIAL_PORTS = ["/dev/ttyACM0", "/dev/ttyACM1"]
 # Usually (but not always),
 #  - TEENSY1 is on usb port '/dev/ttyACM1'
 #  - TEENSY2 is on usb port '/dev/ttyACM0'
 
 
-
 def move_pointer_commands(i1, i2):
     return [
-        np.array(list(b'L1') + [0, i1, 0, 0, 0], dtype="uint8"),
-        np.array(list(b'L1') + [0, i2, 20, 32, 0], dtype="uint8")
+        np.array(list(b"L1") + [0, i1, 0, 0, 0], dtype="uint8"),
+        np.array(list(b"L1") + [0, i2, 20, 32, 0], dtype="uint8"),
     ]
-    
+
 
 def manual_testing(ser):
 
@@ -79,7 +77,6 @@ def manual_testing(ser):
     command_queue = deque()
     led_id = 0
     while True:
-
         # Check for new key presses
         events = pygame.event.get()
         for event in events:
@@ -103,7 +100,7 @@ def manual_testing(ser):
             if len(command_queue) > 0:
                 data = command_queue.pop()
                 send_data_to_arduino(ser, data)
-                #logger.info("Command sent.")
+                # logger.info("Command sent.")
                 waiting_for_response = True
 
         if ser.in_waiting > 0:
@@ -116,8 +113,8 @@ def manual_testing(ser):
             else:
                 # Process data from Arduino - data integrity checks
                 assert data_received.shape[0] == 6
-                num_bytes_received = (
-                    int(data_received[0]) * 256 + int(data_received[1])
+                num_bytes_received = int(data_received[0]) * 256 + int(
+                    data_received[1]
                 )
                 data_sum = (
                     int(data_received[2]) * 16777216
@@ -128,10 +125,12 @@ def manual_testing(ser):
                 assert num_bytes_received == data.shape[0]
                 if data_sum == data.sum():
                     pass
-                    #logger.info(f"Test {i_iter} complete.")
+                    # logger.info(f"Test {i_iter} complete.")
                 else:
                     logger.debug(f"Test {i_iter} checksum failed.")
-                    logger.debug(f"Received: {data_sum}, expected: {data.sum()}.")
+                    logger.debug(
+                        f"Received: {data_sum}, expected: {data.sum()}."
+                    )
                 i_iter += 1
                 waiting_for_response = False
                 time.sleep(0.5)
@@ -145,11 +144,11 @@ def run_test(board, ser):
     command_list.append(clear_all_leds())
 
     command_list.append(show_now())
-    
+
     # LEDs per strip
-    leds_per_strip= {
-        'TEENSY1': [100, 100, 98, 100, 100, 100, 100, 100],
-        'TEENSY2': [99, 99, 99, 100, 100, 100, 100, 98]
+    leds_per_strip = {
+        "TEENSY1": [100, 100, 98, 100, 100, 100, 100, 100],
+        "TEENSY2": [99, 99, 99, 100, 100, 100, 100, 98],
     }
     first_led_of_strip = {
         name: np.cumsum([0] + leds) for name, leds in leds_per_strip.items()
@@ -161,7 +160,6 @@ def run_test(board, ser):
 
     # Iterate over strips
     for s in range(0, 8):
-
         start_led = s * MAX_LEDS_PER_STRIP
         n_leds = leds_per_strip[board][s]
 
@@ -173,15 +171,17 @@ def run_test(board, ser):
 
         # Light all in between leds
         leds = np.arange(start_led + 1, start_led + n_leds - 1)
-#         rgb_array = 16 * np.ones((leds.shape[0], 3), dtype='uint8')
-#         command_list.append(set_leds(leds, rgb_array))
+        #         rgb_array = 16 * np.ones((leds.shape[0], 3), dtype='uint8')
+        #         command_list.append(set_leds(leds, rgb_array))
         rgb = np.full((3,), 16, dtype=np.uint8)
         command_list.append(set_leds_one_colour(leds, rgb))
-        
+
         # Try to light additional leds at end of strip that should
         # not exist
         if n_leds < MAX_LEDS_PER_STRIP:
-            leds = np.arange(start_led + n_leds, start_led + MAX_LEDS_PER_STRIP)
+            leds = np.arange(
+                start_led + n_leds, start_led + MAX_LEDS_PER_STRIP
+            )
             rgb_array = np.repeat([YELLOW], leds.shape[0], axis=0)
             command_list.append(set_leds(leds, rgb_array))
 
@@ -199,21 +199,20 @@ def run_test(board, ser):
     n_iter = len(command_list)
     i_iter = 0
     while i_iter < n_iter:
-
         if ser.in_waiting == 0 and waiting_for_response is False:
             try:
                 data = next(command_list_cycle)
             except IndexError:
                 break
-            #logger.info(f"Sending Test {i_iter} data...")
+            # logger.info(f"Sending Test {i_iter} data...")
             send_data_to_arduino(ser, data)
-            #logger.info("Data sent.")
+            # logger.info("Data sent.")
             waiting_for_response = True
 
         if ser.in_waiting > 0:
-            #logger.info("Receiving data...")
+            # logger.info("Receiving data...")
             data_received = receive_data_from_arduino(ser)
-            #logger.info("Data received.")
+            # logger.info("Data received.")
             if np.array_equal(data_received[:2], [0, 0]):
                 # Debug message from Arduino
                 logger.info(f"Debug message: {data_received[2:].tobytes()}")
@@ -221,8 +220,8 @@ def run_test(board, ser):
             else:
                 # Process data from Arduino - data integrity checks
                 assert data_received.shape[0] == 6
-                num_bytes_received = (
-                    int(data_received[0]) * 256 + int(data_received[1])
+                num_bytes_received = int(data_received[0]) * 256 + int(
+                    data_received[1]
                 )
                 data_sum = (
                     int(data_received[2]) * 16777216
@@ -232,7 +231,7 @@ def run_test(board, ser):
                 )
                 assert num_bytes_received == data.shape[0]
                 assert data_sum == data.sum()
-                #logger.info(f"Test {i_iter} complete.")
+                # logger.info(f"Test {i_iter} complete.")
                 i_iter += 1
                 waiting_for_response = False
 
@@ -245,8 +244,8 @@ def open_serial_connections(ports):
     connections = {}
     for port in SERIAL_PORTS:
         conn = serial.Serial(port, baudrate=BAUD_RATE)
-        logger.info(f'Connected to port {port}.')
-        
+        logger.info(f"Connected to port {port}.")
+
         status, message = connect_to_arduino(conn)
         if status == 0:
             worker_name = message
@@ -261,19 +260,19 @@ def open_serial_connections(ports):
 def close_serial_connections(connections):
     for name, conn in connections.items():
         conn.close()
-        logger.info(f'Closed connection to {name}.')
+        logger.info(f"Closed connection to {name}.")
 
 
 def main():
-    logger.info('='*35)
-    logger.info(f'{filename} started.')
+    logger.info("=" * 35)
+    logger.info(f"{filename} started.")
     connections = open_serial_connections(SERIAL_PORTS)
-    for board in ['TEENSY1', 'TEENSY2']:
+    for board in ["TEENSY1", "TEENSY2"]:
         run_test(board, connections[board])
-    
-    #manual_testing(connections['TEENSY1'])
+
+    # manual_testing(connections['TEENSY1'])
     close_serial_connections(connections)
-    logger.info(f'{filename} ended.')
+    logger.info(f"{filename} ended.")
 
 
 if __name__ == "__main__":

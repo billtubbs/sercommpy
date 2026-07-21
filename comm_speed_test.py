@@ -2,7 +2,9 @@ from itertools import cycle
 import numpy as np
 import serial
 from serial_comm.serial_comm import (
-    connect_to_arduino, send_data_to_arduino, receive_data_from_arduino
+    connect_to_arduino,
+    send_data_to_arduino,
+    receive_data_from_arduino,
 )
 import logging
 import os
@@ -10,14 +12,14 @@ import time
 
 
 logger = logging.getLogger(__name__)
-LOG_FORMAT = '%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s'
+LOG_FORMAT = "%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s"
 filename = os.path.basename(__file__)
 os.path.splitext(os.path.basename(__file__))
 logging.basicConfig(
-    filename=os.path.splitext(filename)[0] + '.log',
+    filename=os.path.splitext(filename)[0] + ".log",
     level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
-    format=LOG_FORMAT
+    format=LOG_FORMAT,
 )
 
 
@@ -32,7 +34,7 @@ def run_test(ser):
         (1, np.tile(np.arange(256, dtype="uint8"), 18)),
         (2, np.tile(np.arange(255, -1, -1, dtype="uint8"), 18)),
         (3, np.random.randint(256, size=4608, dtype="uint8")),
-        (4, np.random.randint(256, size=4608, dtype="uint8"))
+        (4, np.random.randint(256, size=4608, dtype="uint8")),
     ]
 
     # Calculate check-sums to check data transmission
@@ -53,7 +55,6 @@ def run_test(ser):
     n_iter = 100
     i_iter = 0
     while i_iter < n_iter:
-
         if ser.in_waiting == 0 and waiting_for_response is False:
             try:
                 i, data, check_sum = next(test_data_cycle)
@@ -72,8 +73,8 @@ def run_test(ser):
                 logger.info(f"Debug message: {data_received[2:].tobytes()}")
             else:
                 assert data_received.shape[0] == 6
-                num_bytes_received = (
-                    int(data_received[0]) * 256 + int(data_received[1])
+                num_bytes_received = int(data_received[0]) * 256 + int(
+                    data_received[1]
                 )
                 data_sum = (
                     int(data_received[2]) * 16777216
@@ -93,8 +94,8 @@ def run_test(ser):
 
 
 def main():
-    logger.info('='*35)
-    logger.info(f'{filename} started.')
+    logger.info("=" * 35)
+    logger.info(f"{filename} started.")
     ser = connect()
     logger.info("Connected to Arduino.")
     run_test(ser)
