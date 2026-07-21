@@ -71,7 +71,7 @@ NUMBER_OF_LEDS = {"TEENSY1": 798, "TEENSY2": 795}
 
 @jit(
     [types.uint8[:, :](types.int32[:]), types.uint8[:, :](types.int64[:])],
-    nopython=True,
+    nopython=True, cache=True
 )
 def make_idx_array(leds):
     idx = np.empty((leds.shape[0], 2), dtype=np.uint8)
@@ -82,7 +82,10 @@ def make_idx_array(leds):
     return idx
 
 
-@jit([types.Tuple((int32_array, int32_array))(int32_array, int32_array)], nopython=True)
+@jit(
+    [types.Tuple((int32_array, int32_array))(int32_array, int32_array)], 
+    nopython=True, cache=True
+)
 def _board_leds(leds, led_idx):
     """Filter led ids into separate lists for each board."""
     n = len(leds)
@@ -118,7 +121,7 @@ return_type = types.Tuple(
 
 @jit(
     [return_type(int32_array_1d, uint8_array_2d, int32_array_1d)],
-    nopython=True,
+    nopython=True, cache=True
 )
 def _board_leds_with_rgb(leds, rgb_array, led_idx):
     """Filter led ids into separate lists for each board."""
@@ -155,8 +158,11 @@ def _board_leds_with_rgb(leds, rgb_array, led_idx):
     return board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1
 
 
-@jit([writable_uint8_array(readonly_uint8_array),
-      writable_uint8_array(writable_uint8_array)], nopython=True)
+@jit(
+    [writable_uint8_array(readonly_uint8_array), 
+     writable_uint8_array(writable_uint8_array)], 
+    nopython=True, cache=True
+)
 def calc_expected_response(cmd):
     """
     Calculate the expected response of the Arduino to the command.

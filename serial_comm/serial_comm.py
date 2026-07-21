@@ -24,7 +24,6 @@ readonly_uint8_array = types.Array(types.uint8, 1, 'C', readonly=True)
 writable_uint8_array = types.Array(types.uint8, 1, 'C')
 
 
-
 def connect_to_arduino(ser, timeout_time=10, hello_message=b'My name is '):
     # Wait for the initial hello message from the Arduino
     t0 = time.time()
@@ -79,7 +78,7 @@ def receive_data_from_arduino(ser):
 
 
 @jit([writable_uint8_array(readonly_uint8_array), 
-      writable_uint8_array(writable_uint8_array)], nopython=True)
+      writable_uint8_array(writable_uint8_array)], nopython=True, cache=True)
 def encode_data(data):
     # TODO: Could this be converted to return bytes?
     global SPECIAL_BYTE
@@ -94,7 +93,7 @@ def encode_data(data):
 
 
 @jit([writable_uint8_array(readonly_uint8_array), 
-      writable_uint8_array(writable_uint8_array)], nopython=True)
+      writable_uint8_array(writable_uint8_array)], nopython=True, cache=True)
 def decode_data(data_in):
     # TODO: Could this be converted to accept bytes?
     global SPECIAL_BYTE
