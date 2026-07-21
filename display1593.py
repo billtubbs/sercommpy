@@ -13,6 +13,14 @@ from serial_comm.serial_comm import (
     receive_data_from_arduino,
 )
 
+# Numba array types
+readonly_uint8_array = types.Array(types.uint8, 1, 'C', readonly=True)
+writable_uint8_array = types.Array(types.uint8, 1, 'C')
+int32_array = types.Array(types.int32, 1, 'C')
+int32_array_1d = types.Array(types.int32, 1, 'C')
+uint8_array_2d = types.Array(types.uint8, 2, 'C')
+
+
 # Set up logging
 logger = logging.getLogger(__name__)
 LOG_FORMAT = "%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s"
@@ -74,7 +82,7 @@ def make_idx_array(leds):
     return idx
 
 
-@jit(nopython=True)
+@jit([types.Tuple((int32_array, int32_array))(int32_array, int32_array)], nopython=True)
 def _board_leds(leds, led_idx):
     """Filter led ids into separate lists for each board."""
     n = len(leds)
@@ -104,7 +112,14 @@ def _board_leds(leds, led_idx):
     return board_leds_0, board_leds_1
 
 
-@jit(nopython=True)
+return_type = types.Tuple(
+    (int32_array_1d, int32_array_1d, uint8_array_2d, uint8_array_2d)
+)
+
+@jit(
+    [return_type(int32_array_1d, uint8_array_2d, int32_array_1d)],
+    nopython=True,
+)
 def _board_leds_with_rgb(leds, rgb_array, led_idx):
     """Filter led ids into separate lists for each board."""
     n = len(leds)
@@ -140,7 +155,8 @@ def _board_leds_with_rgb(leds, rgb_array, led_idx):
     return board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1
 
 
-@jit(nopython=True)
+@jit([writable_uint8_array(readonly_uint8_array),
+      writable_uint8_array(writable_uint8_array)], nopython=True)
 def calc_expected_response(cmd):
     """
     Calculate the expected response of the Arduino to the command.
@@ -241,7 +257,6 @@ class Display1593:
                     )
             if time.time() > timeout_time:
                 logger.info("Timeout")
-                breakpoint()
                 break
 
     def clear_all(self):
@@ -251,7 +266,6 @@ class Display1593:
             send_data_to_arduino(ser, cmd)
         for ser in self._connections:
             self.check_response(ser, cmd)
-        logger.info("Method clear_all done.")
 
     def set_led(self, i, rgb):
         logger.info("Method set_led.")
@@ -272,7 +286,6 @@ class Display1593:
         )
         send_data_to_arduino(ser, cmd)
         self.check_response(ser, cmd)
-        logger.info("Method set_led done.")
 
     def set_leds(self, leds, rgb_array):
         assert rgb_array.shape[1] == 3
