@@ -258,22 +258,21 @@ class Display1593:
                 waiting = False
                 response = receive_data_from_arduino(ser)
                 if np.array_equal(response, expected_response):
-                    # logger.info("Resp rec'd")
-                    pass
+                    logger.debug("Resp rec'd")
                 elif np.array_equal(response[:2], [0, 0]):
-                    logger.info("Debug msg: %s", bytes(response[2:]).decode())
+                    logger.debug("Debug msg: %s", bytes(response[2:]).decode())
                 else:
-                    logger.info(
+                    logger.warning(
                         "Resp invalid, expected %s, got %s",
                         expected_response,
                         response,
                     )
             if time.time() > timeout_time:
-                logger.info("Timeout")
+                logger.warning("Timeout")
                 break
 
     def clear_all(self):
-        logger.info("Method clear_all.")
+        logger.debug("Method clear_all.")
         cmd = COMMAND_LC
         for ser in self._connections:
             send_data_to_arduino(ser, cmd)
@@ -281,7 +280,7 @@ class Display1593:
             self.check_response(ser, cmd)
 
     def set_led(self, i, rgb):
-        logger.info("Method set_led.")
+        logger.debug("Method set_led.")
         if i < self.led_idx[0]:
             raise ValueError("invalid led id")
         assert len(rgb) == 3
@@ -303,7 +302,7 @@ class Display1593:
     def set_leds(self, leds, rgb_array):
         assert rgb_array.shape[1] == 3
         leds = np.array(leds, dtype="int32")
-        logger.info("Method set_leds with %d leds.", leds.shape[0])
+        logger.debug("Method set_leds with %d leds.", leds.shape[0])
         board_leds_0, board_leds_1, rgb_arrays_0, rgb_arrays_1 = (
             _board_leds_with_rgb(leds, rgb_array, self.led_idx)
         )
@@ -332,7 +331,7 @@ class Display1593:
     def set_leds_one_colour(self, leds, rgb):
         assert len(rgb) == 3
         leds = np.array(leds, dtype="int32")
-        logger.info("Method set_leds_one_colour with %d leds." % leds.shape[0])
+        logger.debug("Method set_leds_one_colour with %d leds." % leds.shape[0])
         board_leds_0, board_leds_1 = _board_leds(leds, self.led_idx)
         board_leds = [board_leds_0, board_leds_1]
         cmds_sent = {}
@@ -351,7 +350,7 @@ class Display1593:
             self.check_response(ser, cmd)
 
     def set_all_leds(self, rgb_array):
-        logger.info("Method set_all_leds.")
+        logger.debug("Method set_all_leds.")
         assert rgb_array.shape == (self.n_leds, 3)
         cmds_sent = {}
         for (i, j), ser in zip(pairwise(self.led_idx), self._connections):
@@ -365,7 +364,7 @@ class Display1593:
             self.check_response(ser, cmd)
 
     def set_all_leds_one_colour(self, rgb):
-        logger.info("Method set_all_leds_one_colour.")
+        logger.debug("Method set_all_leds_one_colour.")
         assert len(rgb) == 3
         # Command CA - implemented
         cmd = np.array((67, 65, *rgb), dtype=np.uint8)
@@ -375,7 +374,7 @@ class Display1593:
             self.check_response(ser, cmd)
 
     def show_now(self):
-        logger.info("Method show_now.")
+        logger.debug("Method show_now.")
         # Command SN - implemented
         # TODO: In future this will be synchronized by comms between boards
         cmd = COMMAND_SN
