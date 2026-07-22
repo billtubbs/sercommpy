@@ -77,9 +77,30 @@ D_CHARS = {
 
 # Brightness divisor by hour-of-day (day/night dimming cycle).
 BCYCLE = {
-    0: 9, 1: 9, 2: 9, 3: 9, 4: 9, 5: 9, 6: 8, 7: 5, 8: 3, 9: 1,
-    10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 1,
-    17: 2, 18: 5, 19: 8, 20: 9, 21: 9, 22: 9, 23: 9,
+    0: 9,
+    1: 9,
+    2: 9,
+    3: 9,
+    4: 9,
+    5: 9,
+    6: 8,
+    7: 5,
+    8: 3,
+    9: 1,
+    10: 1,
+    11: 1,
+    12: 1,
+    13: 1,
+    14: 1,
+    15: 1,
+    16: 1,
+    17: 2,
+    18: 5,
+    19: 8,
+    20: 9,
+    21: 9,
+    22: 9,
+    23: 9,
 }
 
 # Segments 0-6 are cleared when repainting a digit position; segment 7
@@ -247,17 +268,23 @@ def main():
         if d1 == 0:
             d2 = m // 10
             clear_digit(smem, clear_idx[3])
-            apply_segments(smem, processed[3], D_CHARS[d2], bness, accumulate=True)
+            apply_segments(
+                smem, processed[3], D_CHARS[d2], bness, accumulate=True
+            )
 
         if m == 0:
             bness = BCYCLE[hr % 24]
             d4, d3 = hour_digits(hr)
 
             clear_digit(smem, clear_idx[2])
-            apply_segments(smem, processed[2], D_CHARS[d3], bness, accumulate=True)
+            apply_segments(
+                smem, processed[2], D_CHARS[d3], bness, accumulate=True
+            )
 
             clear_digit(smem, clear_idx[1])
-            apply_segments(smem, processed[1], D_CHARS[d4], bness, accumulate=True)
+            apply_segments(
+                smem, processed[1], D_CHARS[d4], bness, accumulate=True
+            )
 
         clear_digit(smem, clear_idx[4])
 
