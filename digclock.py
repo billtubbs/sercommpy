@@ -38,8 +38,9 @@ Program flow
 ------------
 `smem` holds the current target brightness (0-255) for every one of the
 1593 LEDs. `smem_prev` holds the values last actually pushed to the
-display hardware, so only LEDs that changed need to be re-sent each cycle
-(a `-1` sentinel forces every LED to be sent once, on the very first pass).
+display hardware, paired with an `initialized` boolean mask so every LED
+gets sent at least once on the very first pass, without needing a sentinel
+value in `smem_prev` itself.
 
 On startup, the hour digits and the tens-of-minutes digit are painted into
 `smem` once. Then, in the main loop: the ones-of-minutes digit is painted,
@@ -49,12 +50,21 @@ digit (and, when relevant, the higher digit positions) are cleared and
 repainted for the new time.
 """
 
+import logging
 import pickle
 from datetime import datetime
 
 import numpy as np
 
-from display1593 import Display1593
+logging.basicConfig(
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S",
+    format="%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s",
+)
+
+from display1593 import Display1593  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 PICKLE_PATH = "digdata.pickle"
 N_LEDS = 1593
@@ -115,7 +125,7 @@ def load_dig_data(path=PICKLE_PATH):
     """Load the raw digit/segment/LED mapping data from disk."""
     with open(path, "rb") as handle:
         dig_data = pickle.load(handle)
-    print("data for %d digit segments unpickled." % (len(dig_data)))
+    logger.info("data for %d digit segments unpickled.", len(dig_data))
     return dig_data
 
 
@@ -224,70 +234,72 @@ def main():
     smem_prev = np.zeros(N_LEDS, dtype="uint8")
     initialized = np.zeros(N_LEDS, dtype=bool)
 
-    dis = Display1593()
-    dis.connect()
-
-    t = datetime.now().time()
-    hr, m = t.hour, t.minute
-    d4, d3 = hour_digits(hr)
-    d2, d1 = minute_digits(m)
-
-    bness = BCYCLE[hr % 24]
-
-    # Initial paint of points, hours, and tens-of-minutes.
-    # (smem starts at 0, so accumulate vs. overwrite is equivalent here.)
-    apply_segments(smem, processed[0], range(2), bness, accumulate=True)
-    apply_segments(smem, processed[1], D_CHARS[d4], bness, accumulate=True)
-    apply_segments(smem, processed[2], D_CHARS[d3], bness, accumulate=True)
-    apply_segments(smem, processed[3], D_CHARS[d2], bness, accumulate=True)
-
-    # Colon dot LEDs/values, precomputed once for the flashing loop.
-    points_idx = np.concatenate(
-        [processed[0][n][0] for n in range(2) if processed[0][n][0].size]
-    )
-    points_vals = np.concatenate(
-        [processed[0][n][1] for n in range(2) if processed[0][n][1].size]
-    )
-
-    while True:
-        apply_segments(smem, processed[4], D_CHARS[d1], bness, accumulate=True)
-        push_changes(dis, smem, smem_prev, initialized)
-
+    with Display1593() as dis:
         t = datetime.now().time()
         hr, m = t.hour, t.minute
-        print("%2d:%2d " % (hr, m))
+        d4, d3 = hour_digits(hr)
+        d2, d1 = minute_digits(m)
 
-        flash_dots(dis, points_idx, points_vals, bness, m)
+        bness = BCYCLE[hr % 24]
 
-        m = (m + 1) % 60
-        if m == 0:
-            hr = (hr + 1) % 24
+        # Initial paint of points, hours, and tens-of-minutes.
+        # (smem starts at 0, so accumulate vs. overwrite is equivalent here.)
+        apply_segments(smem, processed[0], range(2), bness, accumulate=True)
+        apply_segments(smem, processed[1], D_CHARS[d4], bness, accumulate=True)
+        apply_segments(smem, processed[2], D_CHARS[d3], bness, accumulate=True)
+        apply_segments(smem, processed[3], D_CHARS[d2], bness, accumulate=True)
 
-        d1 = m % 10
+        # Colon dot LEDs/values, precomputed once for the flashing loop.
+        points_idx = np.concatenate(
+            [processed[0][n][0] for n in range(2) if processed[0][n][0].size]
+        )
+        points_vals = np.concatenate(
+            [processed[0][n][1] for n in range(2) if processed[0][n][1].size]
+        )
 
-        if d1 == 0:
-            d2 = m // 10
-            clear_digit(smem, clear_idx[3])
+        while True:
             apply_segments(
-                smem, processed[3], D_CHARS[d2], bness, accumulate=True
+                smem, processed[4], D_CHARS[d1], bness, accumulate=True
             )
+            push_changes(dis, smem, smem_prev, initialized)
 
-        if m == 0:
-            bness = BCYCLE[hr % 24]
-            d4, d3 = hour_digits(hr)
+            t = datetime.now().time()
+            hr, m = t.hour, t.minute
+            logger.info("%2d:%2d", hr, m)
 
-            clear_digit(smem, clear_idx[2])
-            apply_segments(
-                smem, processed[2], D_CHARS[d3], bness, accumulate=True
-            )
+            flash_dots(dis, points_idx, points_vals, bness, m)
 
-            clear_digit(smem, clear_idx[1])
-            apply_segments(
-                smem, processed[1], D_CHARS[d4], bness, accumulate=True
-            )
+            m = (m + 1) % 60
+            if m == 0:
+                hr = (hr + 1) % 24
 
-        clear_digit(smem, clear_idx[4])
+            d1 = m % 10
+
+            if d1 == 0:
+                d2 = m // 10
+                clear_digit(smem, clear_idx[3])
+                apply_segments(
+                    smem, processed[3], D_CHARS[d2], bness, accumulate=True
+                )
+
+            if m == 0:
+                bness = BCYCLE[hr % 24]
+                d4, d3 = hour_digits(hr)
+
+                clear_digit(smem, clear_idx[2])
+                apply_segments(
+                    smem, processed[2], D_CHARS[d3], bness, accumulate=True
+                )
+
+                clear_digit(smem, clear_idx[1])
+                apply_segments(
+                    smem, processed[1], D_CHARS[d4], bness, accumulate=True
+                )
+
+            clear_digit(smem, clear_idx[4])
 
 
 if __name__ == "__main__":
+    logger.info("=" * 35)
+    logger.info(f"{__file__} started.")
     main()
