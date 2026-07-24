@@ -62,7 +62,7 @@ logging.basicConfig(
     format="%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s",
 )
 
-from display1593 import Display1593  # noqa: E402
+from display1593 import Display1593
 
 logger = logging.getLogger(__name__)
 

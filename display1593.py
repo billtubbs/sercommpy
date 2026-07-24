@@ -1,16 +1,16 @@
+import logging
 import os
 import time
-import logging
-import serial
 from itertools import pairwise
 
 import numpy as np
+import serial
 from numba import jit, types
 
 from serial_comm.serial_comm import (
     connect_to_arduino,
-    send_data_to_arduino,
     receive_data_from_arduino,
+    send_data_to_arduino,
 )
 
 # Numba array types
@@ -331,7 +331,9 @@ class Display1593:
     def set_leds_one_colour(self, leds, rgb):
         assert len(rgb) == 3
         leds = np.array(leds, dtype="int32")
-        logger.debug("Method set_leds_one_colour with %d leds." % leds.shape[0])
+        logger.debug(
+            "Method set_leds_one_colour with %d leds." % leds.shape[0]
+        )
         board_leds_0, board_leds_1 = _board_leds(leds, self.led_idx)
         board_leds = [board_leds_0, board_leds_1]
         cmds_sent = {}
