@@ -219,7 +219,10 @@ class Display1593:
             number_of_leds.values(), dtype="int32"
         )
         self.led_idx = np.concatenate(
-            [np.zeros(1, dtype="int32"), np.cumsum(self.leds_per_board)]
+            (
+                np.zeros(1, dtype=np.int32),
+                np.cumsum(self.leds_per_board, dtype=np.int32),
+            )
         )
         self.n_leds = self.led_idx[-1]
         self._connections = []
