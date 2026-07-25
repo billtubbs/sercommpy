@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sercommpy"
+version = "0.1.0"
+description = "Serial communication helpers for Arduino-style devices"
+requires-python = ">=3.9"
+dependencies = [
+  "numpy>=2.2.5",
+  "numba>=0.61.2",
+  "pyserial>=3.5",
+]
+
+[tool.setuptools]
+packages = ["serial_comm"]
