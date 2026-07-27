@@ -1,5 +1,6 @@
 import numpy as np
-from serial_comm.serial_comm import encode_data, decode_data
+
+from serial_comm.serial_comm import decode_data, encode_data
 
 
 def test_serial_comm():

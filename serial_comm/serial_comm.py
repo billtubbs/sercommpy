@@ -7,11 +7,11 @@ May 2025
 """
 
 import time
-import numpy as np
-import numba as nb
-from numba import jit, types
 from itertools import chain
 
+import numba as nb
+import numpy as np
+from numba import jit, types
 
 MY_NAME = "HostComputer"
 START_MARKER = 254
